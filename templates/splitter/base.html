@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en" class="bg-slate-50 text-slate-900 antialiased">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SplitFlow — Superstore Bill Splitter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="min-h-screen flex flex-col">
+  <!-- Top Glassmorphic Navbar -->
+  <header class="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200">
+    <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+      <a href="{% url 'receipt_list' %}" class="flex items-center gap-2.5 group">
+        <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold shadow-sm shadow-indigo-200 group-hover:bg-indigo-500 transition">
+          S
+        </div>
+        <div>
+          <span class="font-bold text-lg tracking-tight text-slate-900">SplitFlow</span>
+          <span class="hidden sm:inline-block ml-2 text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">Superstore &rarr; Splitwise</span>
+        </div>
+      </a>
+      <nav class="flex items-center gap-4 text-sm font-medium">
+        <a href="{% url 'receipt_list' %}" class="text-slate-600 hover:text-indigo-600 transition">Inbox</a>
+        <a href="{% url 'receipt_list' %}?archived=1" class="text-slate-600 hover:text-indigo-600 transition">Archived</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="flex-1 max-w-6xl w-full mx-auto px-6 py-8">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

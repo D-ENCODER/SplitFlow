@@ -1,0 +1,19 @@
+# Python & Virtual Env
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Django & Local SQLite Data
+*.sqlite3
+data/
+.env
+
+# Personal Superstore HTML Receipts (keep folder structure, ignore actual bills)
+rcsscrapper/receipts_inbox/*.html
+
+# IDEs & OS
+.idea/
+.vscode/
+.DS_Store

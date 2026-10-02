@@ -1,0 +1,15 @@
+services:
+  superstore-splitter:
+    build: .
+    container_name: superstore_splitter
+    user: "1000:1000"
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./rcsscrapper:/app/rcsscrapper
+      - ./templates:/app/templates
+    command: >
+      sh -c "python manage.py migrate &&
+             gunicorn rcsscrapper.wsgi:application --bind 0.0.0.0:8000 --workers 2 --reload"

@@ -31,9 +31,13 @@
           <span class="hidden sm:inline-block ml-2 text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">Superstore &rarr; Splitwise</span>
         </div>
       </a>
-      <nav class="flex items-center gap-4 text-sm font-medium">
+      <nav class="flex items-center gap-5 text-sm font-medium">
         <a href="{% url 'receipt_list' %}" class="text-slate-600 hover:text-indigo-600 transition">Inbox</a>
         <a href="{% url 'receipt_list' %}?archived=1" class="text-slate-600 hover:text-indigo-600 transition">Archived</a>
+          <a href="{% url 'analytics_dashboard' %}" class="hover:text-indigo-600 transition flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+            <span>Analytics</span>
+          </a>
       </nav>
     </div>
   </header>

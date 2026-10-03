@@ -13,6 +13,7 @@ from bs4 import BeautifulSoup
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from rcsscrapper.utils import INBOX_DIR
+from collections import defaultdict
 
 
 
@@ -453,3 +454,102 @@ def export_latex_pdf(request):
             response = HttpResponse(tex_source, content_type="text/plain")
             response["Content-Disposition"] = 'attachment; filename="Splitwise_Monthly_Summary.tex"'
             return response
+
+
+def analytics_dashboard(request):
+    sync_receipts_folder()
+    ensure_roommates()
+
+    receipts = list(Receipt.objects.all().order_by('file_modified_at', 'id'))
+    roommates = list(Roommate.objects.all())
+    num_roommates = len(roommates)
+
+    roommate_totals = {r.name: Decimal('0.00') for r in roommates}
+    bill_labels = []
+    bill_totals = []
+    bill_roommate_series = {r.name: [] for r in roommates}
+    product_stats = defaultdict(lambda: {'spent': Decimal('0.00'), 'count': 0, 'img': None})
+
+    total_spent = Decimal('0.00')
+    total_tax = Decimal('0.00')
+    total_items_count = 0
+
+    for receipt in receipts:
+        items = list(receipt.items.prefetch_related('shares__roommate'))
+        if not items:
+            continue
+
+        items_sum = sum((i.total_price for i in items), Decimal('0.00'))
+        bill_total = (items_sum + receipt.tax_amount).quantize(Decimal('0.01'))
+        total_spent += bill_total
+        total_tax += receipt.tax_amount
+        total_items_count += len(items)
+
+        # Clean label for X-axis (e.g. "March 19" or short order ID)
+        if receipt.order_date_str:
+            label = receipt.order_date_str.split(',')[0].strip()
+        else:
+            label = receipt.filename.replace('Superstore_Order_', '#').replace('.html', '')[-6:]
+        bill_labels.append(label)
+        bill_totals.append(float(bill_total))
+
+        r_exact = {r.name: Decimal('0.0000') for r in roommates}
+        for item in items:
+            key = item.name.strip()
+            product_stats[key]['spent'] += item.total_price
+            product_stats[key]['count'] += 1
+            if item.image_url and not product_stats[key]['img']:
+                product_stats[key]['img'] = item.image_url
+
+            tot_units = sum(s.units for s in item.shares.all())
+            if tot_units > 0:
+                for s in item.shares.all():
+                    r_exact[s.roommate.name] += item.total_price * (s.units / tot_units)
+
+        tax_share = (receipt.tax_amount / Decimal(num_roommates)) if num_roommates else Decimal('0.00')
+        for r in roommates:
+            person_bill = (r_exact[r.name] + tax_share).quantize(Decimal('0.01'))
+            roommate_totals[r.name] += person_bill
+            bill_roommate_series[r.name].append(float(person_bill))
+
+    top_products = sorted(
+        [{'name': k, 'spent': v['spent'].quantize(Decimal('0.01')), 'count': v['count'], 'img': v['img']}
+         for k, v in product_stats.items()],
+        key=lambda x: x['spent'],
+        reverse=True
+    )[:8]
+
+    max_product_spent = top_products[0]['spent'] if top_products else Decimal('1.00')
+    for p in top_products:
+        p['pct'] = int((p['spent'] / max_product_spent) * 100) if max_product_spent > 0 else 0
+
+    bill_count = len(bill_labels)
+    avg_bill = (total_spent / Decimal(bill_count)).quantize(Decimal('0.01')) if bill_count else Decimal('0.00')
+
+    roommate_cards = []
+    for r in roommates:
+        amt = roommate_totals[r.name].quantize(Decimal('0.01'))
+        pct = round((float(amt) / float(total_spent)) * 100, 1) if total_spent > 0 else 0
+        roommate_cards.append({'roommate': r, 'total': amt, 'pct': pct})
+
+    chart_payload = {
+        'labels': bill_labels,
+        'bill_totals': bill_totals,
+        'roommate_names': [r.name for r in roommates],
+        'roommate_totals': [float(roommate_totals[r.name]) for r in roommates],
+        'roommate_series': [
+            {'name': r.name, 'data': bill_roommate_series[r.name]}
+            for r in roommates
+        ],
+    }
+
+    return render(request, 'splitter/analytics.html', {
+        'total_spent': total_spent.quantize(Decimal('0.01')),
+        'total_tax': total_tax.quantize(Decimal('0.01')),
+        'avg_bill': avg_bill,
+        'bill_count': bill_count,
+        'total_items_count': total_items_count,
+        'roommate_cards': roommate_cards,
+        'top_products': top_products,
+        'chart_json': json.dumps(chart_payload),
+    })

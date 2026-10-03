@@ -25,6 +25,7 @@ urlpatterns = [
     path('batch/summary/', views.batch_summary, name='batch_summary'),
     path('batch/export-pdf/', views.export_latex_pdf, name='export_latex_pdf'),
     path('api/ingest/', views.api_ingest_order, name='api_ingest_order'),
+    path('analytics/', views.analytics_dashboard, name='analytics_dashboard'),
     path('receipt/<int:receipt_id>/toggle-archive/', views.toggle_archive_receipt, name='toggle_archive_receipt'),
     path('receipt/<int:receipt_id>/delete/', views.delete_receipt, name='delete_receipt'),
     path('receipt/<int:receipt_id>/toggle-archive/', views.toggle_archive_receipt, name='toggle_archive_receipt'),

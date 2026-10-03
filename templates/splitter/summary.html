@@ -9,11 +9,15 @@
         Splitwise Summary ({{ receipts|length }} Bill{{ receipts|length|pluralize }})
       </h1>
     </div>
-    <div class="flex items-center gap-3">
+    <div class="flex flex-wrap items-center gap-3">
       <div class="px-4 py-2 rounded-xl bg-white border border-slate-200 text-sm">
         <span class="text-slate-500">Grand Total:</span>
         <strong class="font-mono text-slate-900 ml-1">${{ grand_total }}</strong>
       </div>
+      <button type="button" onclick="copySplitwisePayload(this)"
+              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold shadow-sm shadow-emerald-100 transition cursor-pointer">
+        Copy All for Splitwise
+      </button>
       <a href="{% url 'export_latex_pdf' %}?ids={{ ids_param }}"
          class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold shadow-sm shadow-indigo-100 transition">
         Download LaTeX PDF
@@ -94,14 +98,17 @@
           </thead>
           <tbody class="divide-y divide-slate-100">
             {% for ir in rep.item_rows %}
-            <tr class="hover:bg-slate-50/70">
-              <td class="py-3 pl-5 pr-3 font-medium text-slate-800">{{ ir.item.name }}</td>
+            <tr class="hover:bg-slate-50/70 group">
+              <td class="py-3 pl-5 pr-3 font-medium text-slate-800">
+                <a href="{% url 'batch_process' %}?ids={{ ids_param }}&item_id={{ ir.item.id }}&from=summary"
+                   class="hover:text-indigo-600 flex items-center gap-2">
+                  <span>{{ ir.item.name }}</span>
+                  <span class="opacity-0 group-hover:opacity-100 text-[11px] font-semibold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 transition">
+                    Edit
+                  </span>
+                </a>
+              </td>
               <td class="py-3 px-3 text-xs text-slate-500">{{ ir.item.quantity_str }}</td>
-              <td class="py-3 px-3 text-right font-mono text-slate-700">${{ ir.item.total_price }}</td>
-              {% for val in ir.splits_by_roommate %}
-                <td class="py-3 px-4 text-right font-mono {% if val == 0 %}text-slate-300{% else %}text-slate-900 font-medium{% endif %}">
-                  {% if val == 0 %}&mdash;{% else %}${{ val }}{% endif %}
-                </td>
               {% endfor %}
             </tr>
             {% endfor %}
@@ -129,4 +136,21 @@
     {% endfor %}
   </div>
 </div>
+<script>
+  function copySplitwisePayload(btn) {
+    const payload = {
+      description: "Superstore ({{ receipts|length }} bill{{ receipts|length|pluralize }})",
+      total: "{{ grand_total }}",
+      shares: {
+        {% for row in summary_rows %}
+        "{{ row.roommate.name|lower }}": "{{ row.final_total }}"{% if not forloop.last %},{% endif %}
+        {% endfor %}
+      }
+    };
+    navigator.clipboard.writeText(JSON.stringify(payload));
+    const oldText = btn.textContent;
+    btn.textContent = "Copied Splitwise Data!";
+    setTimeout(() => btn.textContent = oldText, 2000);
+  }
+</script>
 {% endblock %}

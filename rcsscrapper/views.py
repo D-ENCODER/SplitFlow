@@ -148,12 +148,24 @@ def batch_process(request):
     if not receipt_ids:
         return redirect('receipt_list')
 
-    roommates = Roommate.objects.all()
-    unassigned_qs = ReceiptItem.objects.filter(
-        receipt_id__in=receipt_ids, is_assigned=False
-    ).select_related('receipt').order_by('receipt__file_modified_at', 'id')
+    roommates = list(Roommate.objects.all())
+    all_items = list(
+        ReceiptItem.objects.filter(receipt_id__in=receipt_ids)
+        .select_related('receipt')
+        .order_by('receipt__file_modified_at', 'id')
+    )
 
-    item = unassigned_qs.first()
+    # #4: Allow jumping to a specific item (for "Previous Item" or editing from Summary Matrix)
+    specific_item_id = request.GET.get('item_id')
+    return_to = request.GET.get('from', '')
+
+    item = None
+    if specific_item_id and specific_item_id.isdigit():
+        item = next((i for i in all_items if i.id == int(specific_item_id)), None)
+
+    if not item:
+        item = next((i for i in all_items if not i.is_assigned), None)
+
     if not item:
         Receipt.objects.filter(id__in=receipt_ids).update(processed=True)
         return redirect(f"{reverse('batch_summary')}?ids={ids_param}")
@@ -171,23 +183,57 @@ def batch_process(request):
         if total_units > 0:
             item.is_assigned = True
             item.save()
-            # Mark individual receipt processed if all its items are done
             if not item.receipt.items.filter(is_assigned=False).exists():
                 item.receipt.processed = True
                 item.receipt.save()
+
+            # If we clicked "Edit" from the Summary page, go right back to Summary after saving!
+            if return_to == 'summary':
+                return redirect(f"{reverse('batch_summary')}?ids={ids_param}")
             return redirect(f"{reverse('batch_process')}?ids={ids_param}")
 
-    total_items = ReceiptItem.objects.filter(receipt_id__in=receipt_ids).count()
-    assigned_items = ReceiptItem.objects.filter(receipt_id__in=receipt_ids, is_assigned=True).count()
+    # Find current index & Previous Item ID for the "<- Previous Item" button (#4)
+    current_idx = all_items.index(item)
+    prev_item = all_items[current_idx - 1] if current_idx > 0 else None
+
+    # #2: Smart Item Memory (or load existing shares if editing a previous item)
+    initial_units = {r.id: Decimal('0') for r in roommates}
+    smart_matched = False
+
+    existing_shares = list(item.shares.all())
+    if existing_shares:
+        for s in existing_shares:
+            initial_units[s.roommate_id] = s.units
+    else:
+        # Look up the most recent past item with the exact same name that was already split
+        last_assigned = (
+            ReceiptItem.objects.filter(name__iexact=item.name, is_assigned=True)
+            .exclude(id=item.id)
+            .order_by('-id')
+            .first()
+        )
+        if last_assigned:
+            for s in last_assigned.shares.all():
+                initial_units[s.roommate_id] = s.units
+            smart_matched = True
+
+    roommate_rows = [
+        {'roommate': r, 'initial_unit': f"{initial_units[r.id]:g}"}
+        for r in roommates
+    ]
 
     return render(request, 'splitter/assign_item.html', {
         'receipt': item.receipt,
         'item': item,
         'roommates': roommates,
+        'roommate_rows': roommate_rows,
+        'smart_matched': smart_matched,
+        'prev_item': prev_item,
+        'return_to': return_to,
         'ids_param': ids_param,
         'progress': {
-            'current': assigned_items + 1,
-            'total': total_items,
+            'current': current_idx + 1,
+            'total': len(all_items),
             'receipt_count': len(receipt_ids),
         }
     })

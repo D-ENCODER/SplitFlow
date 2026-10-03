@@ -153,10 +153,10 @@ def batch_process(request):
     all_items = list(
         ReceiptItem.objects.filter(receipt_id__in=receipt_ids)
         .select_related('receipt')
+        .prefetch_related('shares')
         .order_by('receipt__file_modified_at', 'id')
     )
 
-    # #4: Allow jumping to a specific item (for "Previous Item" or editing from Summary Matrix)
     specific_item_id = request.GET.get('item_id')
     return_to = request.GET.get('from', '')
 
@@ -188,16 +188,31 @@ def batch_process(request):
                 item.receipt.processed = True
                 item.receipt.save()
 
-            # If we clicked "Edit" from the Summary page, go right back to Summary after saving!
             if return_to == 'summary':
                 return redirect(f"{reverse('batch_summary')}?ids={ids_param}")
             return redirect(f"{reverse('batch_process')}?ids={ids_param}")
 
-    # Find current index & Previous Item ID for the "<- Previous Item" button (#4)
+    # Find current index & Previous Item ID for the "<- Previous Item" button
     current_idx = all_items.index(item)
     prev_item = all_items[current_idx - 1] if current_idx > 0 else None
 
-    # #2: Smart Item Memory (or load existing shares if editing a previous item)
+    # Calculate running base totals across the batch (already-split items + 1/4 tax share)
+    num_roommates = len(roommates)
+    batch_receipts = Receipt.objects.filter(id__in=receipt_ids)
+    total_batch_tax = sum((r.tax_amount for r in batch_receipts), Decimal('0.00'))
+    tax_per_person = (total_batch_tax / Decimal(num_roommates)) if num_roommates > 0 else Decimal('0.00')
+
+    base_totals = {r.id: tax_per_person for r in roommates}
+    for other_item in all_items:
+        if other_item.id == item.id or not other_item.is_assigned:
+            continue
+        shares = list(other_item.shares.all())
+        tot_u = sum(s.units for s in shares)
+        if tot_u > 0:
+            for s in shares:
+                base_totals[s.roommate_id] += other_item.total_price * (s.units / tot_u)
+
+    # Smart Item Memory (or load existing shares if editing a previous item)
     initial_units = {r.id: Decimal('0') for r in roommates}
     smart_matched = False
 
@@ -206,7 +221,6 @@ def batch_process(request):
         for s in existing_shares:
             initial_units[s.roommate_id] = s.units
     else:
-        # Look up the most recent past item with the exact same name that was already split
         last_assigned = (
             ReceiptItem.objects.filter(name__iexact=item.name, is_assigned=True)
             .exclude(id=item.id)
@@ -219,7 +233,11 @@ def batch_process(request):
             smart_matched = True
 
     roommate_rows = [
-        {'roommate': r, 'initial_unit': f"{initial_units[r.id]:g}"}
+        {
+            'roommate': r,
+            'initial_unit': f"{initial_units[r.id]:g}",
+            'base_total': f"{base_totals[r.id]:.4f}",
+        }
         for r in roommates
     ]
 
@@ -238,6 +256,7 @@ def batch_process(request):
             'receipt_count': len(receipt_ids),
         }
     })
+
 
 def build_summary_data(receipt_ids):
     sync_receipts_folder()

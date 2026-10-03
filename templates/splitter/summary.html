@@ -109,6 +109,11 @@
                 </a>
               </td>
               <td class="py-3 px-3 text-xs text-slate-500">{{ ir.item.quantity_str }}</td>
+              <td class="py-3 px-3 text-right font-mono text-slate-700">${{ ir.item.total_price }}</td>
+              {% for val in ir.splits_by_roommate %}
+                <td class="py-3 px-4 text-right font-mono {% if val == 0 %}text-slate-300{% else %}text-slate-900 font-medium{% endif %}">
+                  {% if val == 0 %}&mdash;{% else %}${{ val }}{% endif %}
+                </td>
               {% endfor %}
             </tr>
             {% endfor %}
@@ -136,6 +141,7 @@
     {% endfor %}
   </div>
 </div>
+
 <script>
   function copySplitwisePayload(btn) {
     const payload = {

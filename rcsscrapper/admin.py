@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
-from rcsscrapper.models import Roommate, Receipt, ReceiptItem, ItemShare, Expense, ExpenseSplit
+from rcsscrapper.models import Roommate, Receipt, ReceiptItem, ItemShare, Expense, ExpenseSplit, HouseholdGroup
 
 admin.site.site_header = "SplitFlow Administration"
 admin.site.site_title = "SplitFlow Admin Portal"
@@ -18,6 +18,23 @@ class ReceiptItemInline(admin.TabularInline):
     model = ReceiptItem
     extra = 0
     fields = ('name', 'quantity_str', 'total_price', 'is_assigned')
+
+
+@admin.register(HouseholdGroup)
+class HouseholdGroupAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'group_type', 'members_count_display', 'expenses_count_display', 'created_by', 'created_at')
+    list_filter = ('group_type', 'created_at')
+    search_fields = ('name', 'description')
+    filter_horizontal = ('members',)
+    ordering = ('name',)
+
+    @admin.display(description="Members")
+    def members_count_display(self, obj):
+        return f"{obj.members.count()} members"
+
+    @admin.display(description="Expenses")
+    def expenses_count_display(self, obj):
+        return f"{obj.expenses.count()} expenses"
 
 
 @admin.register(Roommate)
@@ -53,8 +70,8 @@ class RoommateAdmin(admin.ModelAdmin):
 
 @admin.register(Expense)
 class ExpenseAdmin(admin.ModelAdmin):
-    list_display = ('id', 'date', 'description', 'amount_badge', 'category_badge', 'paid_by', 'is_payment', 'payment_to')
-    list_filter = ('category', 'is_payment', 'date', 'paid_by')
+    list_display = ('id', 'date', 'group', 'description', 'amount_badge', 'category_badge', 'paid_by', 'is_payment', 'payment_to')
+    list_filter = ('group', 'category', 'is_payment', 'date', 'paid_by')
     search_fields = ('description', 'notes', 'paid_by__name')
     date_hierarchy = 'date'
     ordering = ('-date', '-id')
@@ -92,8 +109,8 @@ class ExpenseAdmin(admin.ModelAdmin):
 
 @admin.register(Receipt)
 class ReceiptAdmin(admin.ModelAdmin):
-    list_display = ('id', 'filename', 'order_date_str', 'total_bill_display', 'tax_amount', 'items_count_display', 'processed_badge', 'is_archived')
-    list_filter = ('processed', 'is_archived', 'file_modified_at')
+    list_display = ('id', 'filename', 'group', 'order_date_str', 'total_bill_display', 'tax_amount', 'items_count_display', 'processed_badge', 'is_archived')
+    list_filter = ('group', 'processed', 'is_archived', 'file_modified_at')
     search_fields = ('filename', 'order_date_str')
     ordering = ('-file_modified_at', '-id')
     inlines = [ReceiptItemInline]

@@ -100,18 +100,63 @@
   <header class="sticky top-0 z-40 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors duration-200">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4">
       
-      <!-- Left: Logo & Brand -->
-      <a href="{% url 'splitwise_dashboard' %}" class="flex items-center gap-2.5 group shrink-0">
-        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-500 flex items-center justify-center text-white font-black text-base shadow-sm shadow-indigo-300 dark:shadow-indigo-950 group-hover:scale-105 transition-transform">
-          S
+      <!-- Left: Logo & Brand & Active Group Switcher -->
+      <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+        <a href="{% url 'splitwise_dashboard' %}" class="flex items-center gap-2 group shrink-0">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-500 flex items-center justify-center text-white font-black text-base shadow-sm shadow-indigo-300 dark:shadow-indigo-950 group-hover:scale-105 transition-transform">
+            S
+          </div>
+          <span class="font-bold text-lg tracking-tight text-slate-900 dark:text-white hidden sm:inline-block">SplitFlow</span>
+        </a>
+
+        <!-- Group Switcher Dropdown Pill -->
+        {% if request.user.is_authenticated and nav_active_group %}
+        <div class="relative" id="group-switcher-container">
+          <button type="button" onclick="toggleGroupMenu()"
+                  class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 transition cursor-pointer"
+                  title="Switch active group">
+            <span>{{ nav_active_group.type_icon }}</span>
+            <span class="truncate max-w-[110px] sm:max-w-[150px]">{{ nav_active_group.name }}</span>
+            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          <!-- Group Dropdown Menu -->
+          <div id="group-dropdown" class="hidden absolute left-0 mt-2 w-64 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl py-2 z-50 animate-card-enter">
+            <div class="px-3.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800">
+              Switch Group
+            </div>
+            <div class="py-1 max-h-56 overflow-y-auto">
+              {% for g in nav_all_groups %}
+              <a href="{% url 'select_group' g.id %}"
+                 class="flex items-center justify-between px-3.5 py-2 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition {% if g.id == nav_active_group.id %}text-indigo-600 dark:text-indigo-400 bg-indigo-50/60 dark:bg-indigo-950/40{% else %}text-slate-700 dark:text-slate-200{% endif %}">
+                <span class="flex items-center gap-2 truncate">
+                  <span>{{ g.type_icon }}</span>
+                  <span class="truncate">{{ g.name }}</span>
+                </span>
+                {% if g.id == nav_active_group.id %}
+                  <span class="text-indigo-600 dark:text-indigo-400 text-xs font-bold">✓</span>
+                {% endif %}
+              </a>
+              {% endfor %}
+            </div>
+            <div class="border-t border-slate-100 dark:border-slate-800 pt-1 mt-1 space-y-0.5">
+              <a href="{% url 'group_list' %}"
+                 class="flex items-center gap-2 px-3.5 py-1.5 text-xs text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-semibold transition">
+                <span>👥</span>
+                <span>Manage All Groups</span>
+              </a>
+              <a href="{% url 'import_splitwise' %}"
+                 class="flex items-center gap-2 px-3.5 py-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-semibold hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition">
+                <span>📥</span>
+                <span>Import from Splitwise</span>
+              </a>
+            </div>
+          </div>
         </div>
-        <div class="flex items-center gap-1.5">
-          <span class="font-bold text-lg tracking-tight text-slate-900 dark:text-white">SplitFlow</span>
-          <span class="hidden md:inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-800/40">
-            Household
-          </span>
-        </div>
-      </a>
+        {% endif %}
+      </div>
 
       <!-- Center: Desktop Navigation Tabs -->
       <nav class="hidden sm:flex items-center gap-1.5 text-sm font-semibold">
@@ -122,6 +167,15 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
           </svg>
           <span>Ledger</span>
+        </a>
+
+        <!-- Groups -->
+        <a href="{% url 'group_list' %}"
+           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all {% if request.resolver_match.url_name in 'group_list,create_group,import_splitwise' %}bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 font-bold{% else %}text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60{% endif %}">
+          <svg class="w-4 h-4 shrink-0 {% if request.resolver_match.url_name in 'group_list,create_group,import_splitwise' %}text-indigo-600 dark:text-indigo-400{% else %}text-slate-400 dark:text-slate-500{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+          <span>Groups</span>
         </a>
 
         <!-- Analytics -->
@@ -323,6 +377,15 @@
         <span>Ledger</span>
       </a>
 
+      <!-- Groups -->
+      <a href="{% url 'group_list' %}"
+         class="flex flex-col items-center gap-1 text-[11px] font-semibold {% if request.resolver_match.url_name in 'group_list,create_group,import_splitwise' %}text-indigo-600 dark:text-indigo-400{% else %}text-slate-400 dark:text-slate-500{% endif %}">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
+        <span>Groups</span>
+      </a>
+
       <!-- Analytics -->
       <a href="{% url 'analytics_dashboard' %}"
          class="flex flex-col items-center gap-1 text-[11px] font-semibold {% if request.resolver_match.url_name == 'analytics_dashboard' %}text-indigo-600 dark:text-indigo-400{% else %}text-slate-400 dark:text-slate-500{% endif %}">
@@ -370,6 +433,14 @@
   </nav>
 
   <script>
+    // Group Switcher Menu Toggle
+    function toggleGroupMenu() {
+      const menu = document.getElementById('group-dropdown');
+      if (menu) {
+        menu.classList.toggle('hidden');
+      }
+    }
+
     // Profile Switcher Menu Toggle
     function toggleProfileMenu() {
       const menu = document.getElementById('profile-dropdown');
@@ -380,10 +451,16 @@
 
     // Close menu when clicking outside
     document.addEventListener('click', function(e) {
-      const container = document.getElementById('profile-menu-container');
-      const dropdown = document.getElementById('profile-dropdown');
-      if (container && dropdown && !container.contains(e.target)) {
-        dropdown.classList.add('hidden');
+      const pContainer = document.getElementById('profile-menu-container');
+      const pDropdown = document.getElementById('profile-dropdown');
+      if (pContainer && pDropdown && !pContainer.contains(e.target)) {
+        pDropdown.classList.add('hidden');
+      }
+
+      const gContainer = document.getElementById('group-switcher-container');
+      const gDropdown = document.getElementById('group-dropdown');
+      if (gContainer && gDropdown && !gContainer.contains(e.target)) {
+        gDropdown.classList.add('hidden');
       }
     });
 

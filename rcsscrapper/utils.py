@@ -80,6 +80,28 @@ def ensure_roommates():
                 rm.is_active = True
                 rm.save()
 
+    # 3. Ensure primary household group exists and is populated
+    ensure_groups()
+
+
+def ensure_groups():
+    from rcsscrapper.models import HouseholdGroup, Roommate, Expense, Receipt
+    group, _ = HouseholdGroup.objects.get_or_create(
+        name='41-27 Centennial',
+        defaults={'group_type': 'home', 'description': 'Primary household group for 41-27 Centennial'}
+    )
+    for rm in Roommate.objects.filter(is_active=True):
+        group.members.add(rm)
+
+    het = Roommate.objects.filter(is_me=True).first()
+    if het and not group.created_by:
+        group.created_by = het
+        group.save()
+
+    Expense.objects.filter(group__isnull=True).update(group=group)
+    Receipt.objects.filter(group__isnull=True).update(group=group)
+    return group
+
 
 def parse_tax_from_soup(soup):
     tax_el = soup.select_one(

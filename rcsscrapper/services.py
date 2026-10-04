@@ -1,14 +1,47 @@
+import io
+import csv
 from decimal import Decimal
+from datetime import datetime
 from django.utils import timezone
 from django.db import transaction
-from rcsscrapper.models import Roommate, Expense, ExpenseSplit, Receipt, ReceiptItem
+from rcsscrapper.models import Roommate, Expense, ExpenseSplit, Receipt, ReceiptItem, HouseholdGroup
+
+
+CATEGORY_MAP = {
+    'Groceries': 'Groceries',
+    'Dining out': 'Dining',
+    'Restaurants': 'Dining',
+    'Food and drink': 'Dining',
+    'Rent': 'Rent',
+    'Electricity': 'Utilities',
+    'Water': 'Utilities',
+    'Trash': 'Utilities',
+    'TV/Phone/Internet': 'Utilities',
+    'Utilities - Other': 'Utilities',
+    'Utilities': 'Utilities',
+    'Household supplies': 'Household',
+    'Cleaning': 'Household',
+    'Furniture': 'Household',
+    'Maintenance': 'Household',
+    'Movies': 'Entertainment',
+    'Sports': 'Entertainment',
+    'Entertainment': 'Entertainment',
+    'Bus/train': 'Transportation',
+    'Car': 'Transportation',
+    'Taxi': 'Transportation',
+    'Transportation - Other': 'Transportation',
+    'Gas/fuel': 'Transportation',
+    'Gifts': 'Gifts',
+    'Payment': 'Payment',
+    'General': 'General',
+}
 
 
 def sync_receipt_to_expense(receipt):
     """
     Syncs a processed or item-assigned Superstore Receipt into an Expense record.
     Calculates exact roommate splits (including equal tax and rounding adjustments)
-    and stores them in ExpenseSplit among currently active roommates.
+    and stores them in ExpenseSplit among currently active roommates of the receipt's group.
     """
     if not receipt.items.exists():
         return None
@@ -18,7 +51,14 @@ def sync_receipt_to_expense(receipt):
     if assigned_count == 0:
         return None
 
-    roommates = list(Roommate.objects.filter(is_active=True))
+    if not receipt.group:
+        from rcsscrapper.utils import ensure_groups
+        receipt.group = ensure_groups()
+        receipt.save()
+
+    target_group = receipt.group
+    group_members = list(target_group.members.filter(is_active=True)) if target_group else []
+    roommates = group_members if group_members else list(Roommate.objects.filter(is_active=True))
     num_roommates = len(roommates)
     if num_roommates == 0:
         return None
@@ -47,7 +87,7 @@ def sync_receipt_to_expense(receipt):
         roommate_totals[r] = person_total
 
     true_receipt_total = (actual_items_sum + receipt.tax_amount).quantize(Decimal('0.01'))
-    # Allocate penny rounding difference to payer (Het)
+    # Allocate penny rounding difference to payer (Het or first roommate)
     diff = true_receipt_total - sum(roommate_totals.values())
     if diff != Decimal('0.00'):
         payer_rm = next((r for r in roommates if r.is_me), roommates[0])
@@ -61,6 +101,7 @@ def sync_receipt_to_expense(receipt):
         expense, _ = Expense.objects.update_or_create(
             receipt=receipt,
             defaults={
+                'group': target_group,
                 'description': desc,
                 'amount': true_receipt_total,
                 'category': 'Groceries',
@@ -123,23 +164,31 @@ def simplify_debts(net_balances, active_roommates):
     return simplified_matrix
 
 
-def calculate_balances(current_roommate=None):
+def calculate_balances(current_roommate=None, group=None):
     """
-    Calculates household balances and simplified debts between active roommates.
+    Calculates household balances and simplified debts between active roommates in a group.
     Returns:
       - net_matrix: simplified pairwise balance matrix (positive = B owes A)
       - user_summary: summary for current_roommate (total_net, total_owed_to_user, total_user_owes, friend_balances)
-      - all_roommates: list of currently active Roommate objects
-      - expenses: chronological list of all expenses
+      - all_roommates: list of group members (or active Roommate objects)
+      - expenses: chronological list of expenses in this group
+      - group: the group object
     """
-    all_roommates_all = list(Roommate.objects.all())
-    active_roommates = list(Roommate.objects.filter(is_active=True))
+    if group:
+        group_members = list(group.members.all())
+        active_roommates = [r for r in group_members if r.is_active]
+        if not active_roommates:
+            active_roommates = group_members
+        expenses_qs = Expense.objects.filter(group=group)
+    else:
+        active_roommates = list(Roommate.objects.filter(is_active=True))
+        expenses_qs = Expense.objects.all()
 
-    # Calculate true net balance for every roommate across all historical transactions
+    all_roommates_all = list(Roommate.objects.all())
     net_balances = {r.id: Decimal('0.00') for r in all_roommates_all}
 
     expenses = list(
-        Expense.objects.select_related('paid_by', 'payment_to', 'receipt')
+        expenses_qs.select_related('paid_by', 'payment_to', 'receipt')
         .prefetch_related('splits__roommate')
         .order_by('-date', '-created_at')
     )
@@ -200,4 +249,244 @@ def calculate_balances(current_roommate=None):
         'user_summary': user_summary,
         'all_roommates': active_roommates,
         'expenses': expenses,
+        'group': group,
+    }
+
+
+def resolve_roommate_for_name(raw_name, target_group=None):
+    clean_name = raw_name.replace('(removed)', '').replace('(Removed)', '').strip()
+    first_token = clean_name.split()[0] if clean_name else 'Unknown'
+
+    rm = Roommate.objects.filter(name__iexact=clean_name).first()
+    if not rm:
+        rm = Roommate.objects.filter(name__iexact=first_token).first()
+    if not rm:
+        rm = Roommate.objects.filter(name__istartswith=first_token).first()
+    if not rm:
+        rm = Roommate.objects.create(name=clean_name, is_active=True)
+
+    if target_group and not target_group.members.filter(id=rm.id).exists():
+        target_group.members.add(rm)
+
+    return rm
+
+
+def import_and_clean_splitwise_csv(file_source, target_group, clean_to_cad=True, filter_zero_members=True, replace_existing=False):
+    """
+    Parses, cleans, and imports a Splitwise CSV export into the target group.
+    - Standardizes currency units to CAD without distorting numeric dollar amounts.
+    - Maps/creates roommates and enrolls them as members of target_group.
+    - Atomically creates Expense and ExpenseSplit records.
+    - Returns summary dictionary and cleaned CAD CSV content for download.
+    """
+    if isinstance(file_source, str):
+        with open(file_source, 'r', encoding='utf-8-sig', errors='replace') as f:
+            content = f.read()
+    elif hasattr(file_source, 'read'):
+        raw = file_source.read()
+        content = raw.decode('utf-8-sig', errors='replace') if isinstance(raw, bytes) else raw
+    else:
+        content = str(file_source)
+
+    reader = csv.reader(io.StringIO(content))
+    header = None
+    all_data_rows = []
+
+    for row in reader:
+        if not row:
+            continue
+        if len(row) >= 5 and row[0].strip().lower() == 'date':
+            header = row
+            break
+
+    if not header:
+        return {
+            'success': False,
+            'error': 'Invalid CSV: Could not find header row starting with "Date".'
+        }
+
+    raw_user_cols = header[5:]
+    if not raw_user_cols:
+        return {
+            'success': False,
+            'error': 'Invalid CSV: No roommate balance columns found after column 5.'
+        }
+
+    # Read remaining rows
+    for row in reader:
+        if not row or not row[0].strip():
+            continue
+        if len(row) > 1 and row[1].strip() == 'Total balance':
+            continue
+        all_data_rows.append(row)
+
+    # Detect user activity
+    active_user_indices = []
+    user_totals = {}
+    for idx, u in enumerate(raw_user_cols):
+        col_total = Decimal('0.00')
+        for r in all_data_rows:
+            if len(r) > 5 + idx and r[5 + idx].strip():
+                try:
+                    col_total += abs(Decimal(r[5 + idx].strip()))
+                except Exception:
+                    pass
+        user_totals[idx] = col_total
+        if not filter_zero_members or col_total > Decimal('0.00'):
+            active_user_indices.append(idx)
+
+    if not active_user_indices:
+        active_user_indices = list(range(len(raw_user_cols)))
+
+    # Resolve roommates for active columns
+    col_to_roommate = {}
+    for idx in active_user_indices:
+        u_name = raw_user_cols[idx]
+        rm = resolve_roommate_for_name(u_name, target_group=target_group)
+        col_to_roommate[idx] = rm
+
+    # Build cleaned CSV
+    cleaned_rows = []
+    cleaned_header = header[:5] + [raw_user_cols[i] for i in active_user_indices]
+    if clean_to_cad:
+        cleaned_header[4] = 'Currency (CAD)'
+    cleaned_rows.append(cleaned_header)
+
+    transactions_to_import = []
+
+    for row_idx, row in enumerate(all_data_rows, 1):
+        date_str = row[0].strip()
+        desc = row[1].strip() if len(row) > 1 else 'Shared Expense'
+        cat = row[2].strip() if len(row) > 2 else 'General'
+        cost_str = row[3].strip() if len(row) > 3 else '0.00'
+
+        try:
+            for fmt in ('%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y', '%Y/%m/%d'):
+                try:
+                    date_val = datetime.strptime(date_str, fmt).date()
+                    break
+                except ValueError:
+                    pass
+            else:
+                date_val = timezone.now().date()
+            cost = Decimal(cost_str) if cost_str else Decimal('0.00')
+        except Exception:
+            continue
+
+        cleaned_row = list(row[:5])
+        if clean_to_cad:
+            cleaned_row[4] = 'CAD'
+        user_vals = {}
+        for idx in active_user_indices:
+            val_str = row[5 + idx].strip() if len(row) > 5 + idx else '0.00'
+            try:
+                val = Decimal(val_str) if val_str else Decimal('0.00')
+            except Exception:
+                val = Decimal('0.00')
+            user_vals[idx] = val
+            cleaned_row.append(f"{val:.2f}")
+
+        cleaned_rows.append(cleaned_row)
+
+        pos_cols = [idx for idx, v in user_vals.items() if v > Decimal('0.00')]
+        neg_cols = [idx for idx, v in user_vals.items() if v < Decimal('0.00')]
+
+        if not pos_cols and not neg_cols:
+            continue
+
+        mapped_cat = CATEGORY_MAP.get(cat, 'General')
+
+        if cat.lower() == 'payment' or 'payment' in desc.lower() or 'paid' in desc.lower():
+            if len(pos_cols) >= 1 and len(neg_cols) >= 1:
+                payer = col_to_roommate[pos_cols[0]]
+                recipient = col_to_roommate[neg_cols[0]]
+                pay_amt = user_vals[pos_cols[0]] if user_vals[pos_cols[0]] > Decimal('0.00') else cost
+                transactions_to_import.append({
+                    'type': 'payment',
+                    'date': date_val,
+                    'description': desc or f"{payer.name} paid {recipient.name}",
+                    'category': 'General',
+                    'amount': abs(pay_amt),
+                    'payer': payer,
+                    'recipient': recipient,
+                })
+        else:
+            if len(pos_cols) >= 1:
+                payer = col_to_roommate[pos_cols[0]]
+                payer_credit = user_vals[pos_cols[0]]
+                payer_share = cost - payer_credit
+
+                splits = {}
+                for borrower_idx in neg_cols:
+                    borrower_rm = col_to_roommate[borrower_idx]
+                    splits[borrower_rm] = abs(user_vals[borrower_idx])
+
+                if payer_share > Decimal('0.00'):
+                    splits[payer] = payer_share
+
+                transactions_to_import.append({
+                    'type': 'expense',
+                    'date': date_val,
+                    'description': desc or "Shared Expense",
+                    'category': mapped_cat,
+                    'amount': cost,
+                    'payer': payer,
+                    'splits': splits,
+                })
+
+    # Perform atomic database writes
+    expenses_created = 0
+    payments_created = 0
+
+    with transaction.atomic():
+        if replace_existing:
+            Expense.objects.filter(group=target_group, receipt__isnull=True).delete()
+
+        for tx in transactions_to_import:
+            if tx['type'] == 'payment':
+                Expense.objects.create(
+                    group=target_group,
+                    description=tx['description'],
+                    amount=tx['amount'],
+                    category='General',
+                    paid_by=tx['payer'],
+                    payment_to=tx['recipient'],
+                    date=tx['date'],
+                    is_payment=True,
+                    notes='Imported from Splitwise'
+                )
+                payments_created += 1
+            else:
+                exp = Expense.objects.create(
+                    group=target_group,
+                    description=tx['description'],
+                    amount=tx['amount'],
+                    category=tx['category'],
+                    paid_by=tx['payer'],
+                    date=tx['date'],
+                    is_payment=False,
+                    notes='Imported from Splitwise'
+                )
+                for rm_obj, split_amt in tx['splits'].items():
+                    ExpenseSplit.objects.create(
+                        expense=exp,
+                        roommate=rm_obj,
+                        amount=split_amt
+                    )
+                expenses_created += 1
+
+    # Generate cleaned CSV string
+    csv_out = io.StringIO()
+    writer = csv.writer(csv_out)
+    writer.writerows(cleaned_rows)
+    cleaned_csv_content = csv_out.getvalue()
+
+    return {
+        'success': True,
+        'group_name': target_group.name,
+        'expenses_created': expenses_created,
+        'payments_created': payments_created,
+        'total_imported': expenses_created + payments_created,
+        'members_count': target_group.members.count(),
+        'cleaned_csv_content': cleaned_csv_content,
     }

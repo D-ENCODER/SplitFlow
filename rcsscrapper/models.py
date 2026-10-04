@@ -3,6 +3,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 
+
 class Roommate(models.Model):
     user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='roommate')
     name = models.CharField(max_length=50)
@@ -18,7 +19,42 @@ class Roommate(models.Model):
         return f"{self.name} (Me)" if self.is_me else self.name
 
 
+class HouseholdGroup(models.Model):
+    GROUP_TYPE_CHOICES = [
+        ('home', 'Apartment / House'),
+        ('trip', 'Trip / Vacation'),
+        ('other', 'Other Group'),
+    ]
+
+    name = models.CharField(max_length=150)
+    description = models.TextField(blank=True, default='')
+    group_type = models.CharField(max_length=30, choices=GROUP_TYPE_CHOICES, default='home')
+    members = models.ManyToManyField(Roommate, related_name='groups', blank=True)
+    created_by = models.ForeignKey(Roommate, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_groups')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def member_count(self):
+        return self.members.count()
+
+    @property
+    def type_icon(self):
+        if self.group_type == 'home':
+            return '🏠'
+        elif self.group_type == 'trip':
+            return '✈️'
+        return '👥'
+
+
 class Receipt(models.Model):
+    group = models.ForeignKey(HouseholdGroup, on_delete=models.SET_NULL, null=True, blank=True, related_name='receipts')
     filename = models.CharField(max_length=255, unique=True)
     tax_amount = models.DecimalField(max_digits=8, decimal_places=2, default=Decimal('0.00'))
     file_modified_at = models.DateTimeField(null=True, blank=True)
@@ -63,6 +99,7 @@ class Expense(models.Model):
         ('Payment', 'Payment'),
     ]
 
+    group = models.ForeignKey(HouseholdGroup, on_delete=models.CASCADE, related_name='expenses', null=True, blank=True)
     description = models.CharField(max_length=255)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     date = models.DateField(default=timezone.now)

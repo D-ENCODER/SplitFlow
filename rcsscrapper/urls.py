@@ -5,7 +5,7 @@ from django.urls import path, re_path
 from django.contrib.staticfiles.views import serve as static_serve
 from rcsscrapper import views
 
-urlpatterns = [
+urlpatterns = [\
     path('admin/', admin.site.urls),
     
     # Splitwise Core Routes
@@ -14,6 +14,12 @@ urlpatterns = [
     path('expenses/add/', views.add_expense, name='add_expense'),
     path('expenses/settle/', views.settle_up, name='settle_up'),
     path('expenses/<int:expense_id>/delete/', views.delete_expense, name='delete_expense'),
+
+    # Household Groups & Switching
+    path('groups/', views.group_list, name='group_list'),
+    path('groups/create/', views.create_group, name='create_group'),
+    path('groups/<int:group_id>/select/', views.select_group, name='select_group'),
+    path('groups/import-splitwise/', views.import_splitwise_view, name='import_splitwise'),
 
     # Authentication Routes
     path('login/', views.login_view, name='login'),

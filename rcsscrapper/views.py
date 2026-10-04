@@ -18,9 +18,10 @@ import json
 import re
 from bs4 import BeautifulSoup
 
-from rcsscrapper.models import Receipt, ReceiptItem, Roommate, ItemShare, Expense, ExpenseSplit
+from rcsscrapper.models import Receipt, ReceiptItem, Roommate, ItemShare, Expense, ExpenseSplit, HouseholdGroup
 from rcsscrapper.utils import sync_receipts_folder, ensure_roommates, INBOX_DIR
-from rcsscrapper.services import sync_receipt_to_expense, sync_all_receipts, calculate_balances
+from rcsscrapper.services import sync_receipt_to_expense, sync_all_receipts, calculate_balances, import_and_clean_splitwise_csv
+from rcsscrapper.context_processors import get_active_group
 
 from functools import wraps
 
@@ -317,8 +318,9 @@ def splitwise_dashboard(request):
     sync_all_receipts()
     active_roommate = get_active_roommate(request)
     is_admin = is_admin_user(request.user)
+    active_group = get_active_group(request)
 
-    ledger_data = calculate_balances(current_roommate=active_roommate)
+    ledger_data = calculate_balances(current_roommate=active_roommate, group=active_group)
     all_roommates = ledger_data['all_roommates']
     user_summary = ledger_data['user_summary']
     expenses = ledger_data['expenses']
@@ -397,6 +399,7 @@ def splitwise_dashboard(request):
         'active_roommate': active_roommate,
         'user_summary': user_summary,
         'all_roommates': all_roommates,
+        'active_group': active_group,
         'page_obj': page_obj,
         'total_expenses_count': len(annotated_expenses),
         'search_q': search_q,
@@ -410,12 +413,17 @@ def splitwise_dashboard(request):
 
 @login_required(login_url='login')
 def add_expense(request):
-    """Create a manual shared expense split equally or with exact custom amounts."""
+    """Create a manual shared expense split equally or with exact custom amounts within active group."""
     active_roommate = get_active_roommate(request)
-    roommates = list(Roommate.objects.filter(is_active=True))
+    active_group = get_active_group(request)
     is_admin = is_admin_user(request.user)
 
     if request.method == 'POST':
+        group_id = request.POST.get('group_id')
+        target_group = HouseholdGroup.objects.filter(id=group_id).first() if group_id else active_group
+        group_members = list(target_group.members.filter(is_active=True)) if target_group else []
+        roommates = group_members if group_members else list(Roommate.objects.filter(is_active=True))
+
         desc = request.POST.get('description', '').strip()
         amount_raw = request.POST.get('amount', '0').strip().replace('$', '')
         category = request.POST.get('category', 'General')
@@ -475,6 +483,7 @@ def add_expense(request):
             return redirect('splitwise_dashboard')
 
         expense = Expense.objects.create(
+            group=target_group,
             description=desc or "Shared Expense",
             amount=total_amount,
             category=category,
@@ -499,11 +508,14 @@ def add_expense(request):
 
 @login_required(login_url='login')
 def settle_up(request):
-    """Record a debt settlement payment between two roommates."""
+    """Record a debt settlement payment between two roommates in active group."""
     active_roommate = get_active_roommate(request)
+    active_group = get_active_group(request)
     is_admin = is_admin_user(request.user)
 
     if request.method == 'POST':
+        group_id = request.POST.get('group_id')
+        target_group = HouseholdGroup.objects.filter(id=group_id).first() if group_id else active_group
         payer_id = request.POST.get('payer_id')
         recipient_id = request.POST.get('recipient_id')
         amount_raw = request.POST.get('amount', '0').strip().replace('$', '')
@@ -540,6 +552,7 @@ def settle_up(request):
                 pass
 
         Expense.objects.create(
+            group=target_group,
             description=f"Payment from {payer.name} to {recipient.name}",
             amount=amount,
             category='General',
@@ -1049,15 +1062,17 @@ def export_latex_pdf(request):
 def analytics_dashboard(request):
     sync_receipts_folder()
     ensure_roommates()
+    active_group = get_active_group(request)
 
     active_tab = request.GET.get("tab", "household")
     if active_tab not in ["household", "superstore"]:
         active_tab = "household"
 
-    active_roommates = list(Roommate.objects.filter(is_active=True))
+    group_members = list(active_group.members.filter(is_active=True)) if active_group else []
+    active_roommates = group_members if group_members else list(Roommate.objects.filter(is_active=True))
 
     splitwise_expenses = list(
-        Expense.objects.filter(is_payment=False)
+        Expense.objects.filter(group=active_group, is_payment=False)
         .select_related("paid_by")
         .prefetch_related("splits__roommate")
         .order_by("date")
@@ -1233,6 +1248,7 @@ def analytics_dashboard(request):
 
     return render(request, "splitter/analytics.html", {
         "active_tab": active_tab,
+        "active_group": active_group,
         "total_household_spent": total_household_spent.quantize(Decimal("0.01")),
         "household_count": household_count,
         "active_months_count": active_months_count,
@@ -1271,3 +1287,132 @@ def service_worker_view(request):
     response = HttpResponse(content, content_type="application/javascript")
     response["Service-Worker-Allowed"] = "/"
     return response
+
+
+# ==========================================
+# GROUP MANAGEMENT & SPLITWISE IMPORT VIEWS
+# ==========================================
+
+@login_required(login_url='login')
+def group_list(request):
+    """View and manage all household, trip, and shared expense groups."""
+    active_group = get_active_group(request)
+    all_groups = list(HouseholdGroup.objects.all().prefetch_related('members', 'expenses'))
+    active_rms = list(Roommate.objects.filter(is_active=True))
+
+    return render(request, 'splitter/group_list.html', {
+        'groups': all_groups,
+        'active_group': active_group,
+        'available_roommates': active_rms,
+    })
+
+
+@login_required(login_url='login')
+def select_group(request, group_id):
+    """Switch the currently active working group."""
+    group = get_object_or_404(HouseholdGroup, id=group_id)
+    request.session['active_group_id'] = group.id
+    messages.success(request, f"Switched active group to '{group.name}'")
+    next_url = request.GET.get('next') or reverse('splitwise_dashboard')
+    return redirect(next_url)
+
+
+@login_required(login_url='login')
+def create_group(request):
+    """Create a brand new group (e.g. House, Trip, Vacation)."""
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        group_type = request.POST.get('group_type', 'home')
+        description = request.POST.get('description', '').strip()
+        member_ids = request.POST.getlist('members')
+
+        if not name:
+            messages.error(request, "Group name cannot be blank.")
+            return redirect('group_list')
+
+        user_rm = getattr(request.user, 'roommate', None)
+        group = HouseholdGroup.objects.create(
+            name=name,
+            group_type=group_type,
+            description=description,
+            created_by=user_rm
+        )
+
+        if user_rm:
+            group.members.add(user_rm)
+
+        for m_id in member_ids:
+            if m_id.isdigit():
+                rm = Roommate.objects.filter(id=int(m_id)).first()
+                if rm:
+                    group.members.add(rm)
+
+        request.session['active_group_id'] = group.id
+        messages.success(request, f"Group '{group.name}' created with {group.members.count()} members!")
+        return redirect('splitwise_dashboard')
+
+    return redirect('group_list')
+
+
+@login_required(login_url='login')
+def import_splitwise_view(request):
+    """
+    Import and clean Splitwise CSV export data into a target group.
+    Supports file upload or 1-click loading from default server dataset (data/41_2026-10-02_export.csv).
+    Optionally allows downloading the cleaned CAD CSV.
+    """
+    active_group = get_active_group(request)
+    all_groups = list(HouseholdGroup.objects.all())
+
+    if request.method == 'POST':
+        action = request.POST.get('action', 'import')
+        group_id = request.POST.get('group_id')
+        target_group = HouseholdGroup.objects.filter(id=group_id).first() if group_id else active_group
+        replace_existing = request.POST.get('replace_existing') == '1'
+
+        file_obj = request.FILES.get('csv_file')
+        use_server_file = request.POST.get('use_server_file') == '1'
+
+        if use_server_file:
+            server_csv = os.path.join(settings.BASE_DIR, 'data', '41_2026-10-02_export.csv')
+            if not os.path.exists(server_csv):
+                messages.error(request, "Default server Splitwise CSV file was not found in data/.")
+                return redirect('import_splitwise')
+            file_source = server_csv
+        elif file_obj:
+            file_source = file_obj
+        else:
+            messages.error(request, "Please choose a Splitwise CSV export file to upload or select the server file.")
+            return redirect('import_splitwise')
+
+        res = import_and_clean_splitwise_csv(
+            file_source=file_source,
+            target_group=target_group,
+            clean_to_cad=True,
+            filter_zero_members=True,
+            replace_existing=replace_existing
+        )
+
+        if not res.get('success'):
+            messages.error(request, f"Import error: {res.get('error')}")
+            return redirect('import_splitwise')
+
+        if action == 'download_cleaned_csv':
+            response = HttpResponse(res['cleaned_csv_content'], content_type='text/csv')
+            safe_name = target_group.name.replace(' ', '_').replace('/', '_')
+            response['Content-Disposition'] = f'attachment; filename="cleaned_{safe_name}_cad.csv"'
+            return response
+
+        request.session['active_group_id'] = target_group.id
+        messages.success(
+            request,
+            f"Successfully cleaned & imported {res['total_imported']} transactions "
+            f"({res['expenses_created']} expenses, {res['payments_created']} payments) "
+            f"into '{target_group.name}'! All figures standardized in CAD."
+        )
+        return redirect('splitwise_dashboard')
+
+    return render(request, 'splitter/import_splitwise.html', {
+        'active_group': active_group,
+        'all_groups': all_groups,
+    })

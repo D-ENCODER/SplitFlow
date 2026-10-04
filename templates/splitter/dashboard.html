@@ -5,11 +5,12 @@
   <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-5 sm:p-7">
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-5">
       <div>
-        <div class="flex items-center gap-2 mb-1.5">
-          <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300">
-            <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-            Household Splitwise Ledger
-          </span>
+        <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+          <a href="{% url 'group_list' %}" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/70 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800 transition shadow-sm" title="Switch Household Group">
+            <span class="text-sm">{{ active_group.type_icon|default:"🏠" }}</span>
+            <span>{{ active_group.name|default:"41-27 Centennial" }}</span>
+            <span class="text-[10px] text-indigo-400">▾</span>
+          </a>
           <span class="text-xs text-slate-400">
             {% if is_admin %}
               Viewing Household Ledger &bull; <strong class="text-amber-600 dark:text-amber-400">👑 Administrator Mode</strong>
@@ -42,6 +43,13 @@
 
       <!-- Action Buttons -->
       <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+        <a href="{% url 'import_splitwise' %}"
+           class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/80 shadow-sm transition">
+          <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+          </svg>
+          <span>Import Splitwise</span>
+        </a>
         <a href="{% url 'analytics_dashboard' %}"
            class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/80 shadow-sm transition">
           <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -354,6 +362,7 @@
 
     <form method="post" action="{% url 'add_expense' %}" class="space-y-4">
       {% csrf_token %}
+      <input type="hidden" name="group_id" value="{{ active_group.id }}">
       <div>
         <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Description</label>
         <input type="text" name="description" required placeholder="e.g. Wi-Fi bill, Household supplies, Pizza"
@@ -451,6 +460,7 @@
 
     <form method="post" action="{% url 'settle_up' %}" class="space-y-4">
       {% csrf_token %}
+      <input type="hidden" name="group_id" value="{{ active_group.id }}">
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Who Paid?</label>

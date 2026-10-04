@@ -15,10 +15,13 @@
   <meta name="application-name" content="SplitFlow">
   <meta name="description" content="Household expense tracking, Splitwise debt settlement, and automated Superstore receipt splitting">
 
-  <!-- Icons for iOS, Android, and Desktop -->
-  <link rel="apple-touch-icon" href="static/icons/splitflow_logo.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="static/icons/splitflow_logo.png">
-  <link rel="icon" type="image/svg+xml" href="static/icons/icon.svg">
+  <!-- Favicons and Browser Tab Icons -->
+  <link rel="icon" type="image/x-icon" href="static/favicon.ico">
+  <link rel="shortcut icon" type="image/x-icon" href="static/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="static/icons/favicon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="static/icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="static/icons/splitflow_logo.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="static/icons/apple-touch-icon.png">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -344,7 +347,7 @@
 
             <!-- Logout -->
             <div class="border-t border-slate-100 dark:border-slate-800 pt-1 mt-1">
-              <a href="#"
+              <a href="login.html"
                  class="flex items-center gap-2.5 px-4 py-2 text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -1249,6 +1252,10 @@
       else if (href === '/analytics/') link.setAttribute('href', 'analytics.html');
       else if (href === '/receipts/') link.setAttribute('href', 'receipts.html');
       else if (href === '/groups/import-splitwise/') link.setAttribute('href', 'import_splitwise.html');
+      else if (href === '/login/') link.setAttribute('href', 'login.html');
+      else if (href === '/register/') link.setAttribute('href', 'register.html');
+      else if (href === '/forgot-password/') link.setAttribute('href', 'forgot_password.html');
+      else if (href === '/logout/') link.setAttribute('href', 'login.html');
       else if (href.startsWith('/batch/assign/')) link.setAttribute('href', 'batch_process.html');
       else if (href.startsWith('/batch/summary/')) link.setAttribute('href', 'batch_summary.html');
     });

@@ -16,9 +16,10 @@ from django.conf import settings
 from django.db import connection
 from django.core.management import call_command
 from django.test import RequestFactory
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, AnonymousUser
 from django.contrib.sessions.backends.db import SessionStore
 from django.contrib.messages.storage.fallback import FallbackStorage
+from django.shortcuts import render
 from django.utils import timezone
 from rcsscrapper.models import HouseholdGroup, Roommate, Expense, ExpenseSplit, Receipt, ReceiptItem, ItemShare
 from rcsscrapper import views
@@ -180,9 +181,9 @@ for name, qty, price, img in receipt_items[:4]:
 # Render View Pipelines using Django RequestFactory
 factory = RequestFactory()
 
-def build_request(path):
+def build_request(path, user=None):
     req = factory.get(path)
-    req.user = alex_user
+    req.user = user or alex_user
     req.session = SessionStore()
     req.session['active_group_id'] = maple_group.id
     req.session.save()
@@ -241,6 +242,10 @@ modal_demo_interactivity = """
       else if (href === '/analytics/') link.setAttribute('href', 'analytics.html');
       else if (href === '/receipts/') link.setAttribute('href', 'receipts.html');
       else if (href === '/groups/import-splitwise/') link.setAttribute('href', 'import_splitwise.html');
+      else if (href === '/login/') link.setAttribute('href', 'login.html');
+      else if (href === '/register/') link.setAttribute('href', 'register.html');
+      else if (href === '/forgot-password/') link.setAttribute('href', 'forgot_password.html');
+      else if (href === '/logout/') link.setAttribute('href', 'login.html');
       else if (href.startsWith('/batch/assign/')) link.setAttribute('href', 'batch_process.html');
       else if (href.startsWith('/batch/summary/')) link.setAttribute('href', 'batch_summary.html');
     });
@@ -266,15 +271,17 @@ def post_process_html(html_content, current_page):
         ('href="/analytics/"', 'href="analytics.html"'),
         ('href="/receipts/"', 'href="receipts.html"'),
         ('href="/groups/import-splitwise/"', 'href="import_splitwise.html"'),
+        ('href="/login/"', 'href="login.html"'),
+        ('href="/register/"', 'href="register.html"'),
+        ('href="/forgot-password/"', 'href="forgot_password.html"'),
+        ('href="/logout/"', 'href="login.html"'),
         (f'href="/batch/assign/?ids={pending_receipt.id}"', 'href="batch_process.html"'),
         (f'href="/batch/summary/?ids={processed_receipt.id}"', 'href="batch_summary.html"'),
         ('href="/batch/assign/"', 'href="batch_process.html"'),
         ('href="/batch/summary/"', 'href="batch_summary.html"'),
         ('href="/manifest.json"', 'href="static/manifest.json"'),
+        ('href="/favicon.ico"', 'href="favicon.ico"'),
         ('href="/profile/"', 'href="#"'),
-        ('href="/login/"', 'href="#"'),
-        ('href="/logout/"', 'href="#"'),
-        ('href="/register/"', 'href="#"'),
         ('href="/groups/create/"', 'href="#"'),
         ('src="/static/', 'src="static/'),
         ('href="/static/', 'href="static/'),
@@ -335,8 +342,28 @@ if hasattr(resp_summary, 'content'):
     with open('docs/batch_summary.html', 'w', encoding='utf-8') as f:
         f.write(html_summary)
 
-# 8. Render 404 Fallback for GitHub Pages
-from django.shortcuts import render
+# 8. Render Login
+req_login = build_request('/login/', user=AnonymousUser())
+resp_login = render(req_login, 'splitter/login.html', {})
+html_login = post_process_html(resp_login.content.decode('utf-8'), 'login.html')
+with open('docs/login.html', 'w', encoding='utf-8') as f:
+    f.write(html_login)
+
+# 9. Render Register
+req_reg = build_request('/register/', user=AnonymousUser())
+resp_reg = render(req_reg, 'splitter/register.html', {})
+html_reg = post_process_html(resp_reg.content.decode('utf-8'), 'register.html')
+with open('docs/register.html', 'w', encoding='utf-8') as f:
+    f.write(html_reg)
+
+# 10. Render Forgot Password
+req_forgot = build_request('/forgot-password/', user=AnonymousUser())
+resp_forgot = render(req_forgot, 'splitter/forgot_password.html', {})
+html_forgot = post_process_html(resp_forgot.content.decode('utf-8'), 'forgot_password.html')
+with open('docs/forgot_password.html', 'w', encoding='utf-8') as f:
+    f.write(html_forgot)
+
+# 11. Render 404 Fallback for GitHub Pages
 req_404 = build_request('/404/')
 resp_404 = render(req_404, '404.html', {'is_admin': True})
 html_404 = post_process_html(resp_404.content.decode('utf-8'), '404.html')

@@ -1,13 +1,16 @@
 {% extends "splitter/base.html" %}
+{% load static %}
 {% block content %}
 <div class="max-w-md mx-auto my-6 sm:my-10 space-y-6 animate-card-enter">
   <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl p-7 sm:p-8 space-y-6">
-    <div class="text-center space-y-2">
-      <div class="w-12 h-12 rounded-2xl bg-indigo-600 text-white font-bold text-xl flex items-center justify-center mx-auto shadow-md shadow-indigo-200 dark:shadow-none">
-        S
+    <div class="text-center space-y-3">
+      <div class="inline-flex items-center justify-center p-2 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm mx-auto">
+        <img src="{% static 'icons/splitflow_logo.png' %}" alt="SplitFlow Logo" class="w-14 h-14 rounded-xl object-contain shadow-sm" />
       </div>
-      <h1 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">Log in to SplitFlow</h1>
-      <p class="text-xs text-slate-500 dark:text-slate-400">Access your personal household ledger &amp; debt settlements</p>
+      <div>
+        <h1 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">Log in to SplitFlow</h1>
+        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Access your personal household ledger &amp; debt settlements</p>
+      </div>
     </div>
 
     {% if error_msg %}

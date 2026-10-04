@@ -1,3 +1,4 @@
+from django.views.generic.base import RedirectView
 import os
 from django.conf import settings
 from django.contrib import admin
@@ -37,6 +38,9 @@ urlpatterns = [\
     path('analytics/', views.analytics_dashboard, name='analytics_dashboard'),
     path('receipt/<int:receipt_id>/toggle-archive/', views.toggle_archive_receipt, name='toggle_archive_receipt'),
     path('receipt/<int:receipt_id>/delete/', views.delete_receipt, name='delete_receipt'),
+
+    # Favicon Route
+    path('favicon.ico', RedirectView.as_view(url='/static/favicon.ico', permanent=True)),
 
     # PWA Routes
     path('manifest.json', views.manifest_view, name='manifest'),

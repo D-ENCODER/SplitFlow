@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full antialiased">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SplitFlow — Live Interactive Demo (GitHub Pages)</title>
+  <link rel="icon" type="image/png" href="images/splitflow_logo.png">
+  
+  <!-- Inter Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] }
+        }
+      }
+    };
+  </script>
+
+  <!-- Chart.js CDN for Analytics Demo -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors">
+
+  <!-- Demo Notice Banner -->
+  <div class="bg-gradient-to-r from-emerald-600 to-teal-700 text-white text-xs py-2 px-4 text-center font-medium shadow-sm">
+    <span>Live Interactive Demo &bull; Synthetic Demo Dataset (The Maple Residence) &bull; Zero Server Required</span>
+    <a href="https://github.com/D-ENCODER/SplitFlow" class="underline ml-2 font-bold hover:text-emerald-100">View GitHub Repo</a>
+  </div>
+
+  <!-- Header Navbar -->
+  <header class="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+      
+      <!-- Brand & Active Group -->
+      <div class="flex items-center gap-3">
+        <a href="#" class="flex items-center gap-2.5">
+          <img src="images/splitflow_logo.png" alt="SplitFlow Logo" class="w-8 h-8 rounded-lg shadow-sm" />
+          <span class="font-bold text-lg tracking-tight text-slate-900 dark:text-white">SplitFlow</span>
+        </a>
+
+        <!-- Group Pill Switcher -->
+        <div class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold">
+          <span>🏠</span>
+          <span id="active-group-name">The Maple Residence</span>
+          <span class="text-[10px] bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-bold px-1.5 py-0.5 rounded">Admin</span>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm font-semibold">
+        <button onclick="switchTab('ledger')" id="tab-btn-ledger" class="px-3 py-1.5 rounded-xl transition bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 font-bold">Ledger</button>
+        <button onclick="switchTab('groups')" id="tab-btn-groups" class="px-3 py-1.5 rounded-xl transition text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60">Groups</button>
+        <button onclick="switchTab('superstore')" id="tab-btn-superstore" class="px-3 py-1.5 rounded-xl transition text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60">Superstore Itemizer</button>
+        <button onclick="switchTab('analytics')" id="tab-btn-analytics" class="px-3 py-1.5 rounded-xl transition text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60">Analytics</button>
+      </nav>
+
+      <!-- Right Actions: Dark Mode & User Profile -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <button onclick="toggleDarkMode()" class="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition" title="Toggle Dark/Light Mode">
+          <span id="theme-icon">🌙</span>
+        </button>
+        <div class="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold">
+          <span class="w-6 h-6 rounded-lg bg-indigo-600 text-white font-bold flex items-center justify-center text-[11px]">A</span>
+          <span class="hidden md:inline">Alex Chen</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
+
+    <!-- ========================================== -->
+    <!-- TAB 1: LEDGER / DASHBOARD -->
+    <!-- ========================================== -->
+    <div id="tab-ledger" class="tab-content active space-y-6">
+      
+      <!-- Balance Cards Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <!-- Net Balance -->
+        <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Total Net Balance</div>
+          <div id="card-total-net" class="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400">+$145.20</div>
+          <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">You are owed overall across household</div>
+        </div>
+
+        <!-- You are Owed -->
+        <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">You are Owed</div>
+          <div id="card-owed-to-me" class="text-3xl font-extrabold text-slate-900 dark:text-white">$210.50</div>
+          <div class="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mt-1">From Sarah and Elena</div>
+        </div>
+
+        <!-- You Owe -->
+        <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">You Owe</div>
+          <div id="card-i-owe" class="text-3xl font-extrabold text-slate-900 dark:text-white">$65.30</div>
+          <div class="text-xs text-rose-500 font-semibold mt-1">To Marcus</div>
+        </div>
+      </div>
+
+      <!-- Action Bar & Friend Balance Summary -->
+      <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div class="space-y-1">
+          <div class="text-sm font-bold text-slate-800 dark:text-slate-200">Roommate Balances</div>
+          <div class="flex flex-wrap gap-2 pt-1" id="friend-balance-pills">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+              Sarah owes you <strong>$120.00</strong>
+            </span>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+              Elena owes you <strong>$90.50</strong>
+            </span>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+              You owe Marcus <strong>$65.30</strong>
+            </span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 w-full md:w-auto">
+          <button onclick="openModal('modal-add-expense')" class="flex-1 md:flex-none px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition">+ Add Expense</button>
+          <button onclick="openModal('modal-settle-up')" class="flex-1 md:flex-none px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition">Settle Up</button>
+        </div>
+      </div>
+
+      <!-- Expense Stream -->
+      <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div class="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+          <span class="text-sm font-bold text-slate-800 dark:text-slate-200">Recent Household Transactions</span>
+          <span class="text-xs text-slate-400">Locked to Today's Server Date</span>
+        </div>
+        <div class="divide-y divide-slate-100 dark:divide-slate-800" id="expense-list">
+          <!-- Dynamically Rendered by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TAB 2: GROUPS -->
+    <!-- ========================================== -->
+    <div id="tab-groups" class="tab-content space-y-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-bold text-slate-900 dark:text-white">Household Groups</h2>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Multi-tenant group scoping with Group Admin role-based access control.</p>
+        </div>
+        <button onclick="alert('In this interactive client-side demo, you are viewing sample group data. Deploy full backend to create unlimited live households.')" class="px-3.5 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-bold shadow-sm">+ Create Group</button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Group 1 -->
+        <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border-2 border-indigo-500/50 shadow-sm relative">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">Active Group</span>
+            <span class="text-xs font-bold px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300">Admin: Alex Chen</span>
+          </div>
+          <h3 class="text-base font-bold text-slate-900 dark:text-white">The Maple Residence</h3>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Primary apartment household with 4 active roommates.</p>
+          <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+            <div class="flex -space-x-1.5">
+              <span class="w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-bold flex items-center justify-center">A</span>
+              <span class="w-6 h-6 rounded-full bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center">S</span>
+              <span class="w-6 h-6 rounded-full bg-amber-600 text-white text-[10px] font-bold flex items-center justify-center">M</span>
+              <span class="w-6 h-6 rounded-full bg-purple-600 text-white text-[10px] font-bold flex items-center justify-center">E</span>
+            </div>
+            <button onclick="alert('Group Admin privilege verified: You have permission to manage this household.')" class="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">Manage Group &amp; Members &rarr;</button>
+          </div>
+        </div>
+
+        <!-- Group 2 -->
+        <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">Trip</span>
+            <span class="text-xs font-semibold text-slate-400">Admin: Marcus Vance</span>
+          </div>
+          <h3 class="text-base font-bold text-slate-900 dark:text-white">Banff Weekend Getaway</h3>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Cabin rental, ski passes, and shared roadtrip gas.</p>
+          <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+            <span class="text-xs text-slate-400">3 participants</span>
+            <button onclick="alert('Switching groups in the full backend persists active group in session.')" class="text-xs font-semibold text-slate-600 dark:text-slate-300 hover:underline">Switch to Group</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TAB 3: SUPERSTORE ITEMIZER -->
+    <!-- ========================================== -->
+    <div id="tab-superstore" class="tab-content space-y-6">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+        <div>
+          <h2 class="text-lg font-bold text-slate-900 dark:text-white">Real Canadian Superstore Order Itemizer</h2>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Automated DOM parsing with penny-perfect bottle deposit &amp; tax reconciliation.</p>
+        </div>
+        <div class="px-3 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-bold">
+          Order #RCS-84920412 &bull; Total: $84.95
+        </div>
+      </div>
+
+      <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead>
+            <tr class="border-b border-slate-200 dark:border-slate-800 text-slate-400 font-bold uppercase tracking-wider">
+              <th class="py-2.5">Item Description</th>
+              <th class="py-2.5">Qty</th>
+              <th class="py-2.5">Price</th>
+              <th class="py-2.5">Allocated Roommates</th>
+              <th class="py-2.5 text-right">Cost Per Person</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 dark:divide-slate-800" id="superstore-items-table">
+            <!-- Dynamically populated -->
+          </tbody>
+        </table>
+
+        <!-- Receipt Reconciliation Math Summary -->
+        <div class="mt-6 pt-4 border-t border-slate-200 dark:border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+          <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+            <div class="text-[11px] text-slate-400">Grocery Items</div>
+            <div class="text-base font-bold text-slate-900 dark:text-white">$81.35</div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+            <div class="text-[11px] text-slate-400">Bottle Deposits &amp; Fees</div>
+            <div class="text-base font-bold text-amber-600 dark:text-amber-400">$1.45</div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+            <div class="text-[11px] text-slate-400">Taxes (GST/PST)</div>
+            <div class="text-base font-bold text-slate-900 dark:text-white">$2.15</div>
+          </div>
+          <div class="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800">
+            <div class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold">Total Reconciled</div>
+            <div class="text-base font-extrabold text-emerald-700 dark:text-emerald-300">$84.95</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TAB 4: ANALYTICS -->
+    <!-- ========================================== -->
+    <div id="tab-analytics" class="tab-content space-y-6">
+      <div>
+        <h2 class="text-lg font-bold text-slate-900 dark:text-white">Household Financial Analytics</h2>
+        <p class="text-xs text-slate-500 dark:text-slate-400">Spending breakdown by category and historical monthly trendlines.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Monthly Chart -->
+        <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Monthly Expenditure (CAD)</h3>
+          <canvas id="monthlyChart" height="200"></canvas>
+        </div>
+
+        <!-- Category Doughnut -->
+        <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Expense Breakdown by Category</h3>
+          <canvas id="categoryChart" height="200"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sample Data Downloads & Documentation Hub -->
+    <div class="mt-12 p-6 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 space-y-3">
+      <div class="font-bold text-slate-800 dark:text-slate-200 text-sm">Synthetic Demo Datasets &amp; Documentation</div>
+      <p>Download sample fixtures to test your own local instance or import historical Splitwise ledgers:</p>
+      <div class="flex flex-wrap gap-2.5">
+        <a href="demo/demo_splitwise_export.csv" download class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-semibold hover:text-indigo-600 transition">
+          <span>Download Sample Splitwise CSV</span>
+        </a>
+        <a href="demo/demo_superstore_receipt.html" download class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-semibold hover:text-indigo-600 transition">
+          <span>Download Sample Superstore Receipt HTML</span>
+        </a>
+        <a href="https://github.com/D-ENCODER/SplitFlow" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition">
+          <span>Explore GitHub Repository &rarr;</span>
+        </a>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ========================================== -->
+  <!-- MODAL: ADD EXPENSE -->
+  <!-- ========================================== -->
+  <div id="modal-add-expense" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-xl">
+      <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+        <h3 class="text-sm font-bold text-slate-900 dark:text-white">Record New Expense</h3>
+        <button onclick="closeModal('modal-add-expense')" class="text-slate-400 hover:text-slate-600">&times;</button>
+      </div>
+
+      <form id="add-expense-form" onsubmit="handleAddExpense(event)" class="space-y-3.5 text-xs">
+        <div>
+          <label class="block font-semibold mb-1 text-slate-700 dark:text-slate-300">Description</label>
+          <input type="text" id="exp-desc" required placeholder="e.g., Organic Groceries, Paper Towels" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold mb-1 text-slate-700 dark:text-slate-300">Amount (CAD)</label>
+            <input type="number" step="0.01" id="exp-amt" required placeholder="0.00" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div>
+            <label class="block font-semibold mb-1 text-slate-700 dark:text-slate-300">Category</label>
+            <select id="exp-cat" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="Groceries">Groceries</option>
+              <option value="Utilities">Utilities</option>
+              <option value="Household">Household</option>
+              <option value="Dining">Dining</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Strictly Locked Date Field -->
+        <div>
+          <label class="block font-semibold mb-1 text-slate-700 dark:text-slate-300">Date (Server-Enforced)</label>
+          <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-mono text-xs w-full">
+            <span>🔒</span>
+            <span id="current-date-badge">2026-10-03</span>
+            <span class="text-[10px] text-slate-400 ml-auto">Immutable current date</span>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold mb-1 text-slate-700 dark:text-slate-300">Paid By</label>
+          <select id="exp-payer" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+            <option value="Alex Chen">Alex Chen (You)</option>
+            <option value="Sarah Jenkins">Sarah Jenkins</option>
+            <option value="Marcus Vance">Marcus Vance</option>
+            <option value="Elena Rostova">Elena Rostova</option>
+          </select>
+        </div>
+
+        <div class="pt-2 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('modal-add-expense')" class="px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold">Add to Ledger</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: SETTLE UP -->
+  <!-- ========================================== -->
+  <div id="modal-settle-up" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-xl">
+      <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+        <h3 class="text-sm font-bold text-slate-900 dark:text-white">Record Settlement Payment</h3>
+        <button onclick="closeModal('modal-settle-up')" class="text-slate-400 hover:text-slate-600">&times;</button>
+      </div>
+
+      <form id="settle-form" onsubmit="handleSettleUp(event)" class="space-y-3.5 text-xs">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold mb-1 text-slate-700 dark:text-slate-300">Payer (Debtor)</label>
+            <select id="settle-payer" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+              <option value="Alex Chen">Alex Chen</option>
+              <option value="Sarah Jenkins">Sarah Jenkins</option>
+              <option value="Marcus Vance">Marcus Vance</option>
+              <option value="Elena Rostova">Elena Rostova</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-semibold mb-1 text-slate-700 dark:text-slate-300">Recipient (Creditor)</label>
+            <select id="settle-recipient" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+              <option value="Marcus Vance">Marcus Vance</option>
+              <option value="Alex Chen">Alex Chen</option>
+              <option value="Sarah Jenkins">Sarah Jenkins</option>
+              <option value="Elena Rostova">Elena Rostova</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold mb-1 text-slate-700 dark:text-slate-300">Payment Amount (CAD)</label>
+          <input type="number" step="0.01" id="settle-amt" required placeholder="65.30" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+        </div>
+
+        <div class="pt-2 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('modal-settle-up')" class="px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold">Record Payment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Application Logic -->
+  <script>
+    // Tab Switching
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.getElementById('tab-' + tabId).classList.add('active');
+
+      ['ledger', 'groups', 'superstore', 'analytics'].forEach(t => {
+        const btn = document.getElementById('tab-btn-' + t);
+        if (t === tabId) {
+          btn.className = 'px-3 py-1.5 rounded-xl transition bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 font-bold';
+        } else {
+          btn.className = 'px-3 py-1.5 rounded-xl transition text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60';
+        }
+      });
+
+      if (tabId === 'analytics') {
+        renderCharts();
+      }
+    }
+
+    // Dark Mode Toggle
+    function toggleDarkMode() {
+      const isDark = document.documentElement.classList.toggle('dark');
+      document.getElementById('theme-icon').innerText = isDark ? '☀️' : '🌙';
+      localStorage.setItem('splitflow-demo-theme', isDark ? 'dark' : 'light');
+    }
+    if (localStorage.getItem('splitflow-demo-theme') === 'dark' || (!localStorage.getItem('splitflow-demo-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.add('dark');
+      document.getElementById('theme-icon').innerText = '☀️';
+    }
+
+    // Modal helpers
+    function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+    // Initial Synthetic Data
+    const roommates = ['Alex Chen', 'Sarah Jenkins', 'Marcus Vance', 'Elena Rostova'];
+    let expenses = [
+      { id: 1, desc: 'Weekly Household Groceries', amt: 124.50, cat: 'Groceries', paidBy: 'Alex Chen', date: '2026-10-03', splitWith: ['Alex Chen', 'Sarah Jenkins', 'Marcus Vance', 'Elena Rostova'], isSettlement: false },
+      { id: 2, desc: 'Fiber High-Speed Internet', amt: 85.00, cat: 'Utilities', paidBy: 'Marcus Vance', date: '2026-10-03', splitWith: ['Alex Chen', 'Sarah Jenkins', 'Marcus Vance', 'Elena Rostova'], isSettlement: false },
+      { id: 3, desc: 'Olive Oil & Kitchen Spices', amt: 34.20, cat: 'Groceries', paidBy: 'Sarah Jenkins', date: '2026-10-02', splitWith: ['Alex Chen', 'Sarah Jenkins'], isSettlement: false },
+      { id: 4, desc: 'Dishwashing Detergent & Sponges', amt: 18.90, cat: 'Household', paidBy: 'Elena Rostova', date: '2026-10-02', splitWith: ['Alex Chen', 'Sarah Jenkins', 'Marcus Vance', 'Elena Rostova'], isSettlement: false },
+      { id: 5, desc: 'Settle Up: Alex to Marcus', amt: 40.00, cat: 'Payment', paidBy: 'Alex Chen', date: '2026-10-03', splitWith: ['Marcus Vance'], isSettlement: true }
+    ];
+
+    // Client-Side Min-Cash-Flow Calculation Engine
+    function recalculateBalances() {
+      const net = {};
+      roommates.forEach(r => net[r] = 0);
+
+      expenses.forEach(e => {
+        if (e.isSettlement) {
+          net[e.paidBy] += e.amt;
+          net[e.splitWith[0]] -= e.amt;
+        } else {
+          net[e.paidBy] += e.amt;
+          const share = e.amt / e.splitWith.length;
+          e.splitWith.forEach(r => net[r] -= share);
+        }
+      });
+
+      const myNet = net['Alex Chen'];
+      const netCard = document.getElementById('card-total-net');
+      if (myNet >= 0) {
+        netCard.innerText = '+$' + myNet.toFixed(2);
+        netCard.className = 'text-3xl font-extrabold text-emerald-600 dark:text-emerald-400';
+      } else {
+        netCard.innerText = '-$' + Math.abs(myNet).toFixed(2);
+        netCard.className = 'text-3xl font-extrabold text-rose-600 dark:text-rose-400';
+      }
+
+      // Render Transaction Stream
+      const container = document.getElementById('expense-list');
+      container.innerHTML = '';
+      expenses.slice().reverse().forEach(e => {
+        const row = document.createElement('div');
+        row.className = 'p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/40 transition text-xs';
+        row.innerHTML = `
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-xl ${e.isSettlement ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600' : 'bg-indigo-50 dark:bg-indigo-950 text-indigo-600'} flex items-center justify-center font-bold">
+              ${e.isSettlement ? '🤝' : '🛒'}
+            </div>
+            <div>
+              <div class="font-bold text-slate-800 dark:text-slate-200">${e.desc}</div>
+              <div class="text-[11px] text-slate-400">${e.date} &bull; Paid by <span class="font-semibold text-slate-600 dark:text-slate-300">${e.paidBy}</span></div>
+            </div>
+          </div>
+          <div class="flex items-center gap-4 text-right">
+            <div>
+              <div class="font-bold text-sm text-slate-900 dark:text-white">$${e.amt.toFixed(2)}</div>
+              <div class="text-[11px] text-slate-400">${e.isSettlement ? 'Direct Payment' : e.splitWith.length + ' shares'}</div>
+            </div>
+            <button onclick="deleteExpense(${e.id})" class="text-slate-300 hover:text-rose-500 font-bold px-1.5 py-0.5 rounded">&times;</button>
+          </div>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function handleAddExpense(ev) {
+      ev.preventDefault();
+      const desc = document.getElementById('exp-desc').value;
+      const amt = parseFloat(document.getElementById('exp-amt').value);
+      const cat = document.getElementById('exp-cat').value;
+      const paidBy = document.getElementById('exp-payer').value;
+
+      expenses.push({
+        id: Date.now(),
+        desc: desc,
+        amt: amt,
+        cat: cat,
+        paidBy: paidBy,
+        date: new Date().toISOString().slice(0, 10),
+        splitWith: [...roommates],
+        isSettlement: false
+      });
+
+      closeModal('modal-add-expense');
+      document.getElementById('add-expense-form').reset();
+      recalculateBalances();
+    }
+
+    function handleSettleUp(ev) {
+      ev.preventDefault();
+      const payer = document.getElementById('settle-payer').value;
+      const recipient = document.getElementById('settle-recipient').value;
+      const amt = parseFloat(document.getElementById('settle-amt').value);
+
+      expenses.push({
+        id: Date.now(),
+        desc: `Settle Up: ${payer} to ${recipient}`,
+        amt: amt,
+        cat: 'Payment',
+        paidBy: payer,
+        date: new Date().toISOString().slice(0, 10),
+        splitWith: [recipient],
+        isSettlement: true
+      });
+
+      closeModal('modal-settle-up');
+      document.getElementById('settle-form').reset();
+      recalculateBalances();
+    }
+
+    function deleteExpense(id) {
+      expenses = expenses.filter(e => e.id !== id);
+      recalculateBalances();
+    }
+
+    // Populate Superstore Table Demo
+    const sampleReceiptItems = [
+      { name: 'Lucerne 2% Partly Skimmed Milk 4L', qty: '1', price: 5.99, assigned: ['Alex', 'Sarah', 'Marcus', 'Elena'] },
+      { name: 'Large Brown Eggs Free Run 18pk', qty: '1', price: 6.49, assigned: ['Alex', 'Sarah', 'Marcus', 'Elena'] },
+      { name: 'Organic Gala Apples 3lb Bag', qty: '1', price: 7.99, assigned: ['Sarah', 'Elena'] },
+      { name: 'Whole Grain Sliced Sandwich Bread', qty: '1', price: 3.79, assigned: ['Alex', 'Marcus'] },
+      { name: 'PC Lemon Sparkling Water 12x355ml', qty: '1', price: 6.49, assigned: ['Alex', 'Sarah', 'Marcus', 'Elena'] },
+      { name: 'Extra Virgin Olive Oil Cold Pressed 1L', qty: '1', price: 14.99, assigned: ['Alex', 'Sarah', 'Marcus', 'Elena'] },
+      { name: 'Free From Boneless Skinless Chicken Breasts 1.2kg', qty: '1', price: 18.50, assigned: ['Alex', 'Sarah'] },
+      { name: 'Bottle Deposit & Environmental Fees (Reconciled)', qty: '1', price: 1.45, assigned: ['Alex', 'Sarah', 'Marcus', 'Elena'] }
+    ];
+
+    function renderSuperstoreTable() {
+      const tbody = document.getElementById('superstore-items-table');
+      tbody.innerHTML = '';
+      sampleReceiptItems.forEach(item => {
+        const perPerson = (item.price / item.assigned.length).toFixed(2);
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 dark:hover:bg-slate-800/40';
+        tr.innerHTML = `
+          <td class="py-2.5 font-semibold text-slate-800 dark:text-slate-200">${item.name}</td>
+          <td class="py-2.5 text-slate-500">${item.qty}</td>
+          <td class="py-2.5 font-mono text-slate-900 dark:text-white">$${item.price.toFixed(2)}</td>
+          <td class="py-2.5">
+            <span class="inline-flex gap-1">
+              ${item.assigned.map(n => `<span class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-300">${n}</span>`).join('')}
+            </span>
+          </td>
+          <td class="py-2.5 text-right font-mono font-bold text-slate-700 dark:text-slate-300">$${perPerson}/ea</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Chart.js Rendering
+    let chartsRendered = false;
+    function renderCharts() {
+      if (chartsRendered) return;
+      chartsRendered = true;
+
+      const ctxM = document.getElementById('monthlyChart').getContext('2d');
+      new Chart(ctxM, {
+        type: 'bar',
+        data: {
+          labels: ['June', 'July', 'August', 'September', 'October'],
+          datasets: [{
+            label: 'Monthly Spending (CAD)',
+            data: [420.50, 580.10, 510.00, 640.80, 520.45],
+            backgroundColor: '#4f46e5',
+            borderRadius: 6
+          }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } } }
+      });
+
+      const ctxC = document.getElementById('categoryChart').getContext('2d');
+      new Chart(ctxC, {
+        type: 'doughnut',
+        data: {
+          labels: ['Groceries', 'Utilities', 'Household', 'Dining'],
+          datasets: [{
+            data: [62, 18, 12, 8],
+            backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ec4899']
+          }]
+        },
+        options: { responsive: true }
+      });
+    }
+
+    // Init
+    recalculateBalances();
+    renderSuperstoreTable();
+  </script>
+</body>
+</html>

@@ -12,6 +12,13 @@
 [![PWA Ready](https://img.shields.io/badge/PWA-Ready-blue?style=flat-square)](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![Build Status](https://img.shields.io/badge/Tests-Passing%20(11%2F11)-brightgreen?style=flat-square)](https://github.com/D-ENCODER/SplitFlow)
+[![GitHub Pages](https://img.shields.io/badge/Live_Demo-GitHub_Pages-059669?style=flat-square&logo=github)](https://d-encoder.github.io/SplitFlow/)
+
+<p align="center" style="margin-top: 14px;">
+  <a href="https://d-encoder.github.io/SplitFlow/">
+    <img src="https://img.shields.io/badge/▶_Launch_Live_Interactive_Demo-GitHub_Pages-059669?style=for-the-badge&logo=github&logoColor=white" alt="Launch Live Demo" />
+  </a>
+</p>
 
 <p align="center">
   <img src="docs/images/dashboard_preview.jpg" alt="SplitFlow Dashboard" width="850" style="border-radius: 8px; border: 1px solid #30363d;" />
@@ -26,6 +33,11 @@
 SplitFlow is a self-hostable, multi-tenant financial application designed for households, roommates, travel groups, and shared living situations. It addresses the growing limitations of commercial platforms like Splitwise by providing an open-source, private, and mathematically verified platform free of paywalls, subscription fees, advertising, and rate limits.
 
 In addition to traditional bill splitting and peer-to-peer equalizations, SplitFlow incorporates specialized ingestion capabilities for digital grocery receipts (Real Canadian Superstore / PC Express), automatically reconciling individual line items, weighted produce, multi-pack promotional pricing, sales taxes, and environmental bottle deposits.
+
+> [!NOTE]
+> **Try the Live Interactive Demo**: Experience the full platform directly in your browser with zero installation or setup: [**https://d-encoder.github.io/SplitFlow/**](https://d-encoder.github.io/SplitFlow/)
+>
+> *The live demo is hosted on GitHub Pages and runs entirely client-side using synthetic demo data ("The Maple Residence" household). No personal or production data is exposed.*
 
 ---
 
@@ -166,15 +178,20 @@ The platform is structured as a decoupled Django monolith running behind an asyn
 └──────────────────┘
 ```
 
-- **`HouseholdGroup`**: Multi-tenant isolation boundary. Every transaction, member link, and receipt is scoped to a group. Provides `is_admin(user)` checking if a user matches `created_by` or possesses superuser privileges.
-- **`Roommate`**: Financial participant profile. Can be linked to a Django `User` account or maintained as an unlinked profile for roommates who have not yet registered.
-- **`Expense`**: Transaction header. The `date` attribute is strictly assigned to `timezone.now().date()` upon insertion.
-- **`ExpenseSplit`**: Itemized owed share. The sum of all splits for an expense must equal `Expense.amount`.
-- **`Receipt`**, **`ReceiptItem`**, **`ReceiptAssignment`**: Ingestion records for digital grocery invoices, capturing item names, units, package prices, taxes, and participant shares.
+---
+
+## 6. Synthetic Demo Datasets & Live Exploration
+
+For public demonstration, testing, and evaluation, SplitFlow includes pre-packaged synthetic datasets that strictly protect personal privacy:
+
+- **Live GitHub Pages Web App**: [https://d-encoder.github.io/SplitFlow/](https://d-encoder.github.io/SplitFlow/) (interactive client-side application simulating the entire platform).
+- **`data/demo/demo_splitwise_export.csv`**: Clean sample CSV export for testing Splitwise migrations.
+- **`data/demo/demo_superstore_receipt.html`**: Validated HTML grocery order (#RCS-84920412) for testing receipt parsing and bottle deposit reconciliation.
+- **`docs/index.html`**: Pure client-side simulation implementing the greedy Min-Cash-Flow algorithm, date locking, and DOM reconciliation.
 
 ---
 
-## 6. Installation & Deployment
+## 7. Installation & Deployment
 
 ### Local Development Setup
 
@@ -217,7 +234,7 @@ docker compose exec web python manage.py collectstatic --noinput
 
 ---
 
-## 7. Testing & Verification
+## 8. Testing & Verification
 
 SplitFlow maintains an automated test suite covering zero-data onboarding, role-based access control, stress testing, and HTML DOM reconciliation:
 
@@ -225,22 +242,14 @@ SplitFlow maintains an automated test suite covering zero-data onboarding, role-
 python manage.py test rcsscrapper
 ```
 
-### Test Case Overview:
-1. `OpenSourceNewUserZeroDataTestCase.test_new_user_registration_and_auto_group_creation`: Validates registration of a new user, automatic creation of their initial household, and assignment as Group Admin.
-2. `OpenSourceNewUserZeroDataTestCase.test_zero_data_dashboard_renders_cleanly`: Confirms that a newly registered user with zero expenses or roommates renders a clean `$0.00` settled state without throwing exceptions.
-3. `OpenSourceNewUserZeroDataTestCase.test_expense_date_enforced_to_today`: Verifies that POST requests attempting to submit past dates are overridden server-side to `today`.
-4. `GroupAdminPermissionsTestCase.test_owner_can_add_member`: Confirms Group Admins can add new members.
-5. `GroupAdminPermissionsTestCase.test_intruder_cannot_modify_group`: Verifies non-admins are blocked from editing or deleting groups.
-6. `GroupAdminPermissionsTestCase.test_owner_cannot_remove_self`: Prevents group abandonment by blocking Group Admins from removing themselves.
-7. `SplitwiseAlgorithmAndStressTestCase.test_pairwise_debt_simplification_cycle`: Evaluates multi-party debt cycles (A owes B, B owes C, C owes A) and confirms complete graph resolution.
-8. `SplitwiseAlgorithmAndStressTestCase.test_multi_party_split_integrity`: Tests custom and equal splits across multiple members.
-9. `SplitwiseAlgorithmAndStressTestCase.test_large_scale_stress_simplification`: Stress-tests 12 roommates across 100 multi-split expenses, verifying balance matrix conservation (`sum == 0`) and execution time under 1.5 seconds.
-10. `SuperstoreParserAndReconciliationTestCase.test_extract_items_and_reconcile_total`: Verifies product itemization, unit parsing, and reconciliation of bottle deposit differentials against known receipt totals.
-11. `SuperstoreParserAndReconciliationTestCase.test_delete_receipt_endpoint_graceful_missing`: Tests idempotent receipt deletion without generating 404 responses.
+- **`OpenSourceNewUserZeroDataTestCase`**: Registration, automated household group creation, clean zero-data state, server-side date enforcement.
+- **`GroupAdminPermissionsTestCase`**: Group Admin permissions, member add/remove, intrusion rejection, owner self-removal protection.
+- **`SplitwiseAlgorithmAndStressTestCase`**: Multi-party cyclical debt simplification, matrix conservation, and high-volume 12-member/100-split stress performance in < 1.5s.
+- **`SuperstoreParserAndReconciliationTestCase`**: HTML itemization, bottle deposit reconciliation ($83.20 order verification), and 404-free graceful deletion.
 
 ---
 
-## 8. Branching & Contribution Workflow
+## 9. Branching & Contribution Workflow
 
 This project adheres to a standard release branching model:
 
@@ -249,6 +258,6 @@ This project adheres to a standard release branching model:
 
 ---
 
-## 9. License
+## 10. License
 
 This project is licensed under the **MIT License**. Refer to the [LICENSE](LICENSE) file for complete terms.

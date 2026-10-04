@@ -1,94 +1,123 @@
-# 📖 User Guide & Handbook: Superstore Household Splitter
+# SplitFlow User Guide and Operational Manual
 
-Welcome to the **Superstore Household Splitter** user guide! This handbook walks you through every feature of the platform, from day-one onboarding to advanced receipt parsing and debt settlement.
-
----
-
-## 🚀 1. Getting Started (Zero-Data Onboarding)
-
-When you launch the app for the very first time:
-1. **Sign Up**: Navigate to `/register/` and fill in your Username, Full Name, and Password.
-2. **Automatic Household Provisioning**:
-   - The platform automatically creates a household named `"<Your Name>'s Household"`.
-   - You are automatically designated as the **Group Admin (👑)** for this household.
-3. **Adding Roommates**:
-   - Head to the **Households / Groups** tab from the top navigation.
-   - Click **Manage Group & Members** on your household card.
-   - You can add registered users or create placeholder roommate profiles directly.
+Welcome to the **SplitFlow** user documentation. This manual covers all operational features of the application, including initial account registration, group administration, expense allocation, debt simplification, Splitwise migration, and automated grocery receipt reconciliation.
 
 ---
 
-## 👑 2. Group Admin & Role-Based Access Control
+## 1. Initial Onboarding and Account Provisioning
 
-Every household has clear governance:
-- **Group Creator / Admin**:
-  - The person who creates the group is its Admin.
-  - Can change group name and settings.
-  - Can add and remove members (the Admin cannot remove themselves).
-  - Can delete the group if no longer needed.
-- **Group Members**:
-  - Can view expenses, analytics, and group balances.
-  - Can record new expenses and settle up debts.
-  - Cannot alter group membership or delete the group.
+When accessing a fresh SplitFlow deployment with zero existing data:
 
----
-
-## 💳 3. Adding & Tracking Expenses
-
-To record a shared purchase:
-1. Click **+ Add Expense** on the dashboard.
-2. **Enforced Current Date**:
-   - The date field is strictly locked to **Today's Date** (`YYYY-MM-DD`) server-side.
-   - This guarantees immutable chronological integrity and prevents retroactive tampering.
-   - *Need to note when an event took place?* Use the **Notes** section (e.g., *"Dinner from Friday night"*).
-3. **Split Options**:
-   - **Equal Split**: Automatically divided among all selected roommates.
-   - **Custom Split**: Assign exact custom dollar shares per roommate.
+1. **User Registration**:
+   - Access `/register/` from the login interface.
+   - Enter your `Username`, `Full Name`, and secure password.
+   - Upon form submission, the system creates your `User` authentication account and associates an active `Roommate` profile.
+2. **Automated Household Provisioning**:
+   - The onboarding engine automatically initializes your primary household group, titled `"<Full Name>'s Household"`.
+   - Your account is assigned as the **Group Admin** with exclusive administrative authority.
+3. **Empty-State Dashboard**:
+   - The dashboard opens directly into a clean, crash-free `$0.00` settled state.
 
 ---
 
-## 🤝 4. Settling Up (Greedy Min-Cash-Flow)
+## 2. Group Governance and Member Management
 
-Instead of complex circular bank transfers, our system uses an optimized **Min-Cash-Flow** simplification algorithm:
-- Total net credit/debt is computed across all members.
-- Transactions are simplified to minimize total cash transfers.
-- Click **Settle Up** -> Choose debtor & creditor -> Confirm payment.
-- Settle-up payments automatically balance historical ledgers.
+SplitFlow implements a role-based access control (RBAC) model to maintain group boundaries and prevent unauthorized changes.
 
----
+### 2.1. Group Admin Privileges
+The creator of a household or group possesses administrative rights:
+- **Rename Group**: Modify display name, group type (home, trip, other), and operational description.
+- **Roster Management**:
+  - Add existing registered users by matching username or email.
+  - Create placeholder roommate profiles for participants who have not yet created accounts.
+  - Remove members from the household (the Group Admin cannot remove themselves to prevent orphaned groups).
+- **Group Deletion**: Permanently retire a group and its historical relationships if no longer needed.
 
-## 📥 5. Splitwise CSV Import
-
-Migrating from Splitwise?
-1. In Splitwise, go to your group settings -> **Export as CSV**.
-2. In Superstore Splitter, navigate to **Households** -> **Import from Splitwise**.
-3. Select your CSV file and optionally choose whether to create a new group or import into an existing one.
-4. The system parses all historical transactions, maps participants, and rebuilds your ledger instantly.
-
----
-
-## 🧾 6. Superstore Receipt Ingestion & Parsing
-
-Designed specifically for Real Canadian Superstore orders:
-- **Automated Ingestion**: Ingests digital receipts via API or automated email scraper.
-- **Accurate Itemization**: Reconciles item descriptions, multi-buy savings, bottle deposits, and sales tax to match final paid amounts down to the exact penny.
-- **Batch Assignment**: Quickly tag items to individual roommates or split common grocery items evenly.
-- **PDF Export**: Generate clean LaTeX / PDF expense summaries for your records.
+### 2.2. Standard Member Privileges
+Standard members who have been added to a household can:
+- Record new shared expenses and equalizing settlements.
+- View real-time balance matrices and historical ledgers.
+- Inspect graphical spending analytics.
+- Members cannot modify group settings or alter member rosters.
 
 ---
 
-## 📊 7. Visual Analytics
+## 3. Recording and Allocating Expenses
 
-Track your household spending:
-- Monthly expenditure breakdown and historical trends.
-- Roommate share distribution charts.
-- Spending category insights (Groceries, Utilities, Household items).
+### 3.1. Server-Enforced Date Integrity
+To ensure chronological auditing and eliminate retroactive debt disputes, the expense date is strictly determined server-side:
+- Every newly created expense is locked to `timezone.now().date()` upon submission.
+- The user interface displays a read-only date indicator.
+- If an expense corresponds to a past event or delayed entry, relevant context must be recorded in the **Notes** field (e.g., *"Concert tickets purchased last weekend"*).
+
+### 3.2. Allocation Methods
+- **Equal Split**: Evenly divides the total cost among all selected participants.
+- **Custom Split**: Allows exact dollar assignments per participant. The application validates that the sum of all individual splits matches the total transaction amount before committing to the database.
 
 ---
 
-## 📱 8. Progressive Web App (PWA)
+## 4. Debt Simplification and Equalization
 
-Install Superstore Splitter as a native-like app on Android, iOS, or Desktop:
-- **Android / Chrome**: Tap the three-dot menu -> **Add to Home screen** or click the install prompt.
-- **iOS / Safari**: Tap **Share** -> **Add to Home Screen**.
-- Enjoy standalone full-screen view, fast offline asset caching, and a clean mobile UI.
+### 4.1. Graph-Theoretic Min-Cash-Flow Simplification
+Rather than requiring every individual to execute separate bilateral bank transfers, SplitFlow processes the entire group ledger through a greedy Min-Cash-Flow graph algorithm:
+1. Computes total net balance per member:
+   $$\text{Net}_i = \sum \text{Paid}_i - \sum \text{Owed}_i$$
+2. Iteratively pairs the largest debtor with the largest creditor.
+3. Minimizes total transfers required to balance the entire group to at most $N - 1$ payments.
+
+### 4.2. Executing a Settlement
+1. Click **Settle Up** on the dashboard.
+2. Select the paying member (debtor) and receiving member (creditor).
+3. Confirm the payment amount.
+4. The system inserts an equalization record with `is_settlement=True`, updating the ledger immediately.
+
+---
+
+## 5. Splitwise CSV Ingestion
+
+To migrate historical ledgers from Splitwise into SplitFlow:
+1. In Splitwise, navigate to your group settings and select **Export as CSV**.
+2. In SplitFlow, navigate to **Groups** -> **Import from Splitwise** (`/groups/import-splitwise/`).
+3. Select your CSV file. Choose whether to import into the current active household or create a newly named group.
+4. The ingestion engine parses currency columns, maps existing participant names via fuzzy resolution, inserts historical expenses, and reconstructs the group's current balance matrix.
+
+---
+
+## 6. Automated Superstore Grocery Receipt Processing
+
+SplitFlow includes an ingestion pipeline specifically tailored for Real Canadian Superstore (PC Express) digital orders:
+
+1. **Digital Receipt Sync**:
+   - Digital orders placed in `rcsscrapper/receipts_inbox/` are scanned and synchronized automatically.
+   - Alternatively, orders can be ingested via the REST API endpoint (`/api/ingest/`).
+2. **Itemization and Image Extraction**:
+   - High-precision DOM parser extracts item names, unit quantities, package weights, and line-item prices.
+   - Fetches product thumbnails directly from Superstore CDN endpoints.
+3. **Penny-Perfect Reconciliation**:
+   - The engine computes:
+     $$\Delta = \text{Total Billed} - \left(\sum \text{Item Prices} + \text{Tax}\right)$$
+   - Identifies bottle deposit fees, environmental handling charges, and promotional adjustments, generating explicit line items so the parsed sum matches the final credit card statement to the exact penny.
+4. **Interactive Assignment Workflow**:
+   - Navigate to **Superstore Inbox** (admin access required).
+   - Use the item assignment interface to allocate individual items to specific roommates or split shared pantry staples evenly.
+   - Review calculated summaries and commit approved splits directly to the household ledger.
+5. **PDF and LaTeX Export**:
+   - Generate formal accounting statements in PDF format via LaTeX templates for archiving.
+
+---
+
+## 7. Spending Analytics
+
+Navigate to the **Analytics** tab (`/analytics/`) to inspect:
+- Monthly expenditure progression and historical trendlines.
+- Spending breakdowns categorized by department (Groceries, Utilities, Household, Rent).
+- Roommate share distribution charts detailing net financial commitments.
+
+---
+
+## 8. Progressive Web Application (PWA)
+
+SplitFlow functions as a Progressive Web Application with native desktop and mobile capabilities:
+- **Installation**: Click the **Install App** button in the navigation header (or choose "Add to Home Screen" in your browser).
+- **Offline Shell**: Service workers cache static assets for fast load times.
+- **Display**: Operates in standalone, full-screen mode without browser address bars.

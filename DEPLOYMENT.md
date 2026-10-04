@@ -1,106 +1,154 @@
-# 🚀 Production Deployment Guide
+# SplitFlow Production Deployment Guide
 
-This guide covers deploying the **Superstore Household Splitter** across various production environments (Docker Compose, Linux VM with Systemd, or Tailscale Private Network).
+This guide covers deployment procedures for **SplitFlow** across standard Linux hosting architectures, including containerized Docker Compose setups, standalone Linux VMs with Systemd and Gunicorn, and private mesh networking via Tailscale HTTPS.
 
 ---
 
-## 🐳 Option 1: Docker Deployment (Recommended)
+## 1. Prerequisites and Environment Configuration
 
-### Prerequisites
-- Docker & Docker Compose installed.
+### Required Software
+- Python 3.12 or newer
+- Docker and Docker Compose (if deploying containerized)
+- Git
 
-### Quick Start
-1. Clone the repository:
+### Environment Variables
+Configure the following variables in a `.env` file located at the repository root:
+
+```ini
+# Production Secret Key (generate a 50+ character cryptographic random string)
+SECRET_KEY="generate-a-strong-random-production-secret-key"
+
+# Security Settings
+DEBUG=False
+ALLOWED_HOSTS="127.0.0.1,localhost,your-domain.com,your-tailscale-node.ts.net"
+CSRF_TRUSTED_ORIGINS="https://your-domain.com,https://your-tailscale-node.ts.net:8443"
+
+# Database Configuration (Defaults to SQLite; configure PostgreSQL via DATABASE_URL if preferred)
+# DATABASE_URL="postgres://splitflow_user:password@localhost:5432/splitflow_db"
+```
+
+---
+
+## 2. Option A: Containerized Deployment via Docker Compose (Recommended)
+
+1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/your-username/DjangoProject.git
-   cd DjangoProject
+   git clone https://github.com/D-ENCODER/SplitFlow.git
+   cd SplitFlow
+   git checkout main
    ```
 
-2. Configure environment variables in `.env`:
-   ```bash
-   SECRET_KEY="your-secure-production-key"
-   DEBUG=False
-   ALLOWED_HOSTS="localhost,127.0.0.1,your-domain.com,your-tailscale-node.ts.net"
-   CSRF_TRUSTED_ORIGINS="https://your-domain.com,https://your-tailscale-node.ts.net:8443"
-   ```
-
-3. Build and launch containers:
+2. **Launch Application Containers**:
    ```bash
    docker compose up -d --build
    ```
 
-4. Run database migrations & collect static files:
+3. **Execute Database Migrations and Static Collection**:
    ```bash
    docker compose exec web python manage.py migrate
    docker compose exec web python manage.py collectstatic --noinput
    ```
 
-5. Create an initial Superuser / Admin:
+4. **Initialize Superuser Account**:
    ```bash
    docker compose exec web python manage.py createsuperuser
    ```
 
 ---
 
-## 🐧 Option 2: Linux VM (Ubuntu / Debian) with Gunicorn & Systemd
+## 3. Option B: Standalone Linux VM (Ubuntu / Debian) with Gunicorn and Systemd
 
 1. **Install System Dependencies**:
    ```bash
    sudo apt update
-   sudo apt install -y python3-venv python3-pip git
+   sudo apt install -y python3-venv python3-pip git nginx
    ```
 
-2. **Setup Virtual Environment & Install Requirements**:
+2. **Clone and Configure Application Directory**:
    ```bash
+   git clone https://github.com/D-ENCODER/SplitFlow.git /var/www/splitflow
+   cd /var/www/splitflow
+   git checkout main
+
    python3 -m venv .venv
    source .venv/bin/activate
+   pip install --upgrade pip
    pip install -r requirements.txt
    ```
 
-3. **Database & Assets**:
+3. **Initialize Database and Static Storage**:
    ```bash
    python manage.py migrate
    python manage.py collectstatic --noinput
    ```
 
-4. **Setup Systemd Service (`/etc/systemd/system/superstore_splitter.service`)**:
+4. **Configure Systemd Service Unit (`/etc/systemd/system/splitflow.service`)**:
    ```ini
    [Unit]
-   Description=Superstore Splitter Gunicorn Daemon
+   Description=SplitFlow Gunicorn WSGI Daemon
    After=network.target
 
    [Service]
-   User=aizen
+   User=www-data
    Group=www-data
-   WorkingDirectory=/home/aizen/PycharmProjects/DjangoProject
-   ExecStart=/home/aizen/PycharmProjects/DjangoProject/.venv/bin/gunicorn \
+   WorkingDirectory=/var/www/splitflow
+   ExecStart=/var/www/splitflow/.venv/bin/gunicorn \
              --workers 3 \
              --bind 127.0.0.1:8000 \
-             DjangoProject.wsgi:application
+             --access-logfile - \
+             --error-logfile - \
+             rcsscrapper.wsgi:application
    Restart=always
+   RestartSec=5
 
    [Install]
    WantedBy=multi-user.target
    ```
 
-5. **Start Service**:
+5. **Start and Enable Service**:
    ```bash
    sudo systemctl daemon-reload
-   sudo systemctl enable --now superstore_splitter
+   sudo systemctl enable --now splitflow
    ```
 
 ---
 
-## 🔒 Option 3: Secure HTTPS via Tailscale
+## 4. Option C: Encrypted Private Mesh Hosting via Tailscale
 
-Tailscale allows seamless, encrypted zero-config access for all household members across devices:
-1. Install Tailscale:
+Tailscale allows deploying SplitFlow securely within a private zero-trust network without exposing ports publicly to the internet.
+
+1. **Install and Authenticate Tailscale**:
    ```bash
    curl -fsSL https://tailscale.com/install.sh | sh
    sudo tailscale up
    ```
-2. Enable Tailscale Serve for automatic HTTPS certificate termination:
+
+2. **Configure Tailscale Serve for Automatic HTTPS**:
    ```bash
    tailscale serve --https=8443 http://127.0.0.1:8000
    ```
-3. Share the tailscale link (`https://<node-name>.<tailnet-name>.ts.net:8443`) with household members!
+
+3. **Access Endpoint**:
+   Share the generated TLS endpoint with authenticated household members:
+   `https://<node-name>.<tailnet-name>.ts.net:8443`
+
+---
+
+## 5. Maintenance and Backup Procedures
+
+### Database Backups
+For SQLite deployments, execute atomic backups using the SQLite online backup utility:
+```bash
+sqlite3 /var/www/splitflow/db.sqlite3 ".backup '/var/backups/splitflow_$(date +%Y%m%d).sqlite3'"
+```
+
+### Upgrading to New Releases
+```bash
+cd /var/www/splitflow
+git pull origin main
+source .venv/bin/activate
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py collectstatic --noinput
+sudo systemctl restart splitflow
+```

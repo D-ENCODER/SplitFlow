@@ -1,0 +1,78 @@
+{% extends "splitter/base.html" %}
+{% block content %}
+<div class="max-w-md mx-auto my-6 sm:my-10 space-y-6 animate-card-enter">
+  <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl p-7 sm:p-8 space-y-6">
+    <div class="text-center space-y-2">
+      <div class="w-12 h-12 rounded-2xl bg-indigo-600 text-white font-bold text-xl flex items-center justify-center mx-auto shadow-md shadow-indigo-200 dark:shadow-none">
+        S
+      </div>
+      <h1 class="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">Log in to SplitFlow</h1>
+      <p class="text-xs text-slate-500 dark:text-slate-400">Manage shared household expenses &amp; Superstore grocery bills</p>
+    </div>
+
+    {% if error_msg %}
+      <div class="p-3.5 rounded-xl text-xs font-semibold bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300">
+        {{ error_msg }}
+      </div>
+    {% endif %}
+
+    <!-- 1-Click Roommate Quick Login -->
+    <div class="space-y-2.5 pt-1">
+      <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 text-center">
+        Quick 1-Click Roommate Login (Default Password: <code>admin</code>)
+      </div>
+      <form method="post" class="grid grid-cols-2 gap-2">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ next }}">
+        {% for r in roommates %}
+        <button type="submit" name="quick_user" value="{{ r.name|lower }}"
+                class="flex items-center gap-2 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/60 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:border-indigo-300 dark:hover:border-indigo-700 transition cursor-pointer text-left">
+          <span class="w-7 h-7 rounded-xl bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center shrink-0">
+            {{ r.name|slice:":1" }}
+          </span>
+          <span class="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
+            {{ r.name }}{% if r.is_me %} (Me){% endif %}
+          </span>
+        </button>
+        {% endfor %}
+      </form>
+    </div>
+
+    <div class="relative flex items-center justify-center">
+      <div class="border-t border-slate-200 dark:border-slate-800 w-full"></div>
+      <span class="bg-white dark:bg-slate-900 px-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider shrink-0">or login with credentials</span>
+    </div>
+
+    <!-- Standard Login Form -->
+    <form method="post" class="space-y-4">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Username or Email</label>
+        <input type="text" name="username" required placeholder="het, ruchit, tirth, or maurya"
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between mb-1.5">
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Password</label>
+          <a href="{% url 'forgot_password' %}" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">Forgot password?</a>
+        </div>
+        <input type="password" name="password" required placeholder="Default password is admin"
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+
+      <button type="submit"
+              class="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm shadow-md shadow-indigo-200 dark:shadow-none transition cursor-pointer">
+        Log In &rarr;
+      </button>
+    </form>
+
+    <div class="text-center text-xs text-slate-500 dark:text-slate-400 pt-1">
+      Don't have an account?
+      <a href="{% url 'register' %}" class="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline ml-1">Sign up</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

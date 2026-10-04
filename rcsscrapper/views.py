@@ -2,21 +2,435 @@ import os
 import subprocess
 import tempfile
 from decimal import Decimal
-from django.http import HttpResponse
+from django.conf import settings
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
-from rcsscrapper.models import Receipt, ReceiptItem, Roommate, ItemShare
-from rcsscrapper.utils import sync_receipts_folder, ensure_roommates
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.models import User
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib import messages
+from django.utils import timezone
+from collections import defaultdict
+from django.core.paginator import Paginator
 import json
 import re
 from bs4 import BeautifulSoup
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from rcsscrapper.utils import INBOX_DIR
-from collections import defaultdict
+
+from rcsscrapper.models import Receipt, ReceiptItem, Roommate, ItemShare, Expense, ExpenseSplit
+from rcsscrapper.utils import sync_receipts_folder, ensure_roommates, INBOX_DIR
+from rcsscrapper.services import sync_receipt_to_expense, sync_all_receipts, calculate_balances
 
 
+def get_active_roommate(request):
+    """Returns the Roommate associated with the logged-in user, or the default 'Het (Me)'."""
+    ensure_roommates()
+    if request.user.is_authenticated and hasattr(request.user, 'roommate') and request.user.roommate:
+        return request.user.roommate
+    return Roommate.objects.filter(is_me=True).first() or Roommate.objects.first()
 
+
+# ==========================================
+# AUTHENTICATION VIEWS
+# ==========================================
+
+def login_view(request):
+    ensure_roommates()
+    error_msg = None
+    next_url = request.GET.get('next') or request.POST.get('next') or reverse('splitwise_dashboard')
+
+    if request.method == 'POST':
+        # Check if 1-click quick login chip was clicked
+        quick_user = request.POST.get('quick_user')
+        if quick_user:
+            user = User.objects.filter(username=quick_user).first()
+            if user:
+                login(request, user)
+                messages.success(request, f"Welcome back, {user.roommate.name if hasattr(user, 'roommate') else user.username}!")
+                return redirect(next_url)
+
+        username_or_email = request.POST.get('username', '').strip()
+        password = request.POST.get('password', '')
+
+        # Authenticate by username or email
+        user = authenticate(request, username=username_or_email, password=password)
+        if not user:
+            user_obj = User.objects.filter(email__iexact=username_or_email).first()
+            if user_obj:
+                user = authenticate(request, username=user_obj.username, password=password)
+
+        if user:
+            login(request, user)
+            rm_name = user.roommate.name if hasattr(user, 'roommate') and user.roommate else user.username
+            messages.success(request, f"Welcome back, {rm_name}!")
+            return redirect(next_url)
+        else:
+            error_msg = "Invalid username or password. (Default password for all roommates is 'admin')"
+
+    roommates = list(Roommate.objects.filter(is_active=True).select_related('user'))
+    return render(request, 'splitter/login.html', {
+        'error_msg': error_msg,
+        'roommates': roommates,
+        'next': next_url,
+    })
+
+
+def register_view(request):
+    ensure_roommates()
+    error_msg = None
+
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip().lower()
+        full_name = request.POST.get('full_name', '').strip()
+        email = request.POST.get('email', '').strip()
+        password = request.POST.get('password', '')
+        password_confirm = request.POST.get('password_confirm', '')
+
+        if not username or not full_name:
+            error_msg = "Username and Full Name are required."
+        elif User.objects.filter(username=username).exists():
+            error_msg = f"Username '{username}' is already taken."
+        elif password != password_confirm:
+            error_msg = "Passwords do not match."
+        elif len(password) < 4:
+            error_msg = "Password must be at least 4 characters."
+        else:
+            user = User.objects.create_user(
+                username=username,
+                email=email or f"{username}@splitflow.local",
+                password=password
+            )
+            # Create or link Roommate profile
+            rm, _ = Roommate.objects.get_or_create(
+                name=full_name,
+                defaults={'user': user, 'email': user.email, 'is_me': False}
+            )
+            rm.user = user
+            rm.email = user.email
+            rm.save()
+
+            login(request, user)
+            messages.success(request, f"Account created! Welcome to SplitFlow, {full_name}!")
+            return redirect('splitwise_dashboard')
+
+    return render(request, 'splitter/register.html', {
+        'error_msg': error_msg,
+    })
+
+
+def logout_view(request):
+    logout(request)
+    messages.info(request, "You have been logged out.")
+    return redirect('login')
+
+
+def switch_profile(request, username):
+    """1-click switch between active roommate profiles."""
+    user = User.objects.filter(username=username.lower()).first()
+    next_url = request.GET.get("next") or request.META.get("HTTP_REFERER") or reverse("splitwise_dashboard")
+    if user:
+        login(request, user)
+        rm_name = user.roommate.name if hasattr(user, "roommate") and user.roommate else user.username
+        messages.success(request, f"Viewing as {rm_name}!")
+    return redirect(next_url)
+
+
+def forgot_password_view(request):
+    ensure_roommates()
+    message = None
+    error_msg = None
+
+    if request.method == 'POST':
+        identifier = request.POST.get('identifier', '').strip()
+        new_password = request.POST.get('new_password', '')
+        confirm_password = request.POST.get('confirm_password', '')
+
+        user = User.objects.filter(username__iexact=identifier).first() or \
+               User.objects.filter(email__iexact=identifier).first()
+
+        if not user:
+            error_msg = f"No profile found matching '{identifier}'."
+        elif not new_password:
+            error_msg = "Please enter a new password."
+        elif new_password != confirm_password:
+            error_msg = "Passwords do not match."
+        else:
+            user.set_password(new_password)
+            user.save()
+            messages.success(request, f"Password successfully updated for {user.username}! You can now log in.")
+            return redirect('login')
+
+    roommates = list(Roommate.objects.filter(is_active=True).select_related('user'))
+    return render(request, 'splitter/forgot_password.html', {
+        'roommates': roommates,
+        'message': message,
+        'error_msg': error_msg,
+    })
+
+
+# ==========================================
+# SPLITWISE CORE EXPENSES & LEDGER VIEWS
+# ==========================================
+
+def splitwise_dashboard(request):
+    """
+    Main Splitwise dashboard:
+    - Net household balance summary
+    - Friend-by-friend debt breakdown
+    - Chronological shared expenses & settlements feed
+    - Quick actions to add expenses or settle up
+    """
+    sync_receipts_folder()
+    sync_all_receipts()
+    active_roommate = get_active_roommate(request)
+
+    ledger_data = calculate_balances(current_roommate=active_roommate)
+    all_roommates = ledger_data['all_roommates']
+    user_summary = ledger_data['user_summary']
+    expenses = ledger_data['expenses']
+
+    # Annotate viewer-specific relation to each expense
+    annotated_expenses = []
+    for exp in expenses:
+        viewer_is_payer = (exp.paid_by_id == active_roommate.id)
+        viewer_split = next((s for s in exp.splits.all() if s.roommate_id == active_roommate.id), None)
+        viewer_share = viewer_split.amount if viewer_split else Decimal('0.00')
+
+        if exp.is_payment:
+            # Settlement record
+            if viewer_is_payer:
+                impact = f"you paid ${exp.amount}"
+                impact_type = 'paid'
+            elif exp.payment_to_id == active_roommate.id:
+                impact = f"paid you ${exp.amount}"
+                impact_type = 'received'
+            else:
+                impact = "not involved"
+                impact_type = 'none'
+        else:
+            # Regular shared expense
+            if viewer_is_payer:
+                net_lent = exp.amount - viewer_share
+                if net_lent > Decimal('0.00'):
+                    impact = f"you lent ${net_lent}"
+                    impact_type = 'lent'
+                else:
+                    impact = "you paid for yourself"
+                    impact_type = 'neutral'
+            else:
+                if viewer_share > Decimal('0.00'):
+                    impact = f"you owe ${viewer_share}"
+                    impact_type = 'borrowed'
+                else:
+                    impact = "not involved"
+                    impact_type = 'none'
+
+        annotated_expenses.append({
+            'expense': exp,
+            'impact': impact,
+            'impact_type': impact_type,
+            'viewer_share': viewer_share,
+        })
+
+    # Stats for grocery scraper
+    inbox_receipts_count = Receipt.objects.filter(is_archived=False).count()
+    pending_receipts_count = Receipt.objects.filter(is_archived=False, processed=False).count()
+
+    search_q = request.GET.get('q', '').strip()
+    selected_cat = request.GET.get('category', '').strip()
+
+    if search_q:
+        q_lower = search_q.lower()
+        annotated_expenses = [
+            item for item in annotated_expenses
+            if q_lower in item['expense'].description.lower() or
+               q_lower in item['expense'].notes.lower() or
+               q_lower in item['expense'].paid_by.name.lower() or
+               (item['expense'].payment_to and q_lower in item['expense'].payment_to.name.lower())
+        ]
+
+    if selected_cat:
+        annotated_expenses = [
+            item for item in annotated_expenses
+            if item['expense'].category.lower() == selected_cat.lower()
+        ]
+
+    paginator = Paginator(annotated_expenses, 35)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'splitter/dashboard.html', {
+        'active_roommate': active_roommate,
+        'user_summary': user_summary,
+        'all_roommates': all_roommates,
+        'page_obj': page_obj,
+        'total_expenses_count': len(annotated_expenses),
+        'search_q': search_q,
+        'selected_cat': selected_cat,
+        'inbox_receipts_count': inbox_receipts_count,
+        'pending_receipts_count': pending_receipts_count,
+        'category_choices': Expense.CATEGORY_CHOICES,
+    })
+
+
+def add_expense(request):
+    """Create a manual shared expense split equally or with exact custom amounts."""
+    active_roommate = get_active_roommate(request)
+    roommates = list(Roommate.objects.filter(is_active=True))
+
+    if request.method == 'POST':
+        desc = request.POST.get('description', '').strip()
+        amount_raw = request.POST.get('amount', '0').strip().replace('$', '')
+        category = request.POST.get('category', 'General')
+        paid_by_id = request.POST.get('paid_by')
+        notes = request.POST.get('notes', '').strip()
+        date_str = request.POST.get('date')
+
+        try:
+            total_amount = Decimal(amount_raw)
+        except Exception:
+            messages.error(request, "Please enter a valid expense amount.")
+            return redirect('splitwise_dashboard')
+
+        if total_amount <= Decimal('0.00'):
+            messages.error(request, "Expense amount must be greater than $0.")
+            return redirect('splitwise_dashboard')
+
+        payer = Roommate.objects.filter(id=paid_by_id).first() or active_roommate
+        exp_date = timezone.now().date()
+        if date_str:
+            try:
+                exp_date = timezone.datetime.strptime(date_str, '%Y-%m-%d').date()
+            except ValueError:
+                pass
+
+        split_type = request.POST.get('split_type', 'equal')
+        selected_rms = request.POST.getlist('split_roommates')
+
+        splits_to_create = {}
+        if split_type == 'equal':
+            # Split equally among selected roommates (or all if none selected)
+            target_rms = [r for r in roommates if str(r.id) in selected_rms] if selected_rms else roommates
+            if not target_rms:
+                target_rms = roommates
+            n = len(target_rms)
+            base_share = (total_amount / Decimal(n)).quantize(Decimal('0.01'))
+            splits_to_create = {r: base_share for r in target_rms}
+            # Adjust penny remainder onto payer or first participant
+            diff = total_amount - sum(splits_to_create.values())
+            first_rm = next((r for r in target_rms if r == payer), target_rms[0])
+            splits_to_create[first_rm] += diff
+        else:
+            # Custom exact amounts specified in POST
+            for r in roommates:
+                val = request.POST.get(f'exact_amount_{r.id}', '0').strip().replace('$', '')
+                try:
+                    amt = Decimal(val or '0')
+                    if amt > Decimal('0.00'):
+                        splits_to_create[r] = amt
+                except Exception:
+                    pass
+
+        if not splits_to_create:
+            messages.error(request, "No roommates selected to split this expense.")
+            return redirect('splitwise_dashboard')
+
+        expense = Expense.objects.create(
+            description=desc or "Shared Expense",
+            amount=total_amount,
+            category=category,
+            paid_by=payer,
+            date=exp_date,
+            notes=notes,
+            is_payment=False
+        )
+
+        for r, amt in splits_to_create.items():
+            ExpenseSplit.objects.create(
+                expense=expense,
+                roommate=r,
+                amount=amt
+            )
+
+        messages.success(request, f"Added '{expense.description}' for ${total_amount}!")
+        return redirect('splitwise_dashboard')
+
+    return redirect('splitwise_dashboard')
+
+
+def settle_up(request):
+    """Record a debt settlement payment between two roommates."""
+    active_roommate = get_active_roommate(request)
+    roommates = list(Roommate.objects.filter(is_active=True))
+
+    if request.method == 'POST':
+        payer_id = request.POST.get('payer_id')
+        recipient_id = request.POST.get('recipient_id')
+        amount_raw = request.POST.get('amount', '0').strip().replace('$', '')
+        notes = request.POST.get('notes', '').strip()
+        date_str = request.POST.get('date')
+
+        try:
+            amount = Decimal(amount_raw)
+        except Exception:
+            messages.error(request, "Please enter a valid settlement amount.")
+            return redirect('splitwise_dashboard')
+
+        if amount <= Decimal('0.00'):
+            messages.error(request, "Payment amount must be greater than $0.")
+            return redirect('splitwise_dashboard')
+
+        if payer_id == recipient_id:
+            messages.error(request, "Payer and recipient cannot be the same person.")
+            return redirect('splitwise_dashboard')
+
+        payer = get_object_or_404(Roommate, id=payer_id)
+        recipient = get_object_or_404(Roommate, id=recipient_id)
+
+        pay_date = timezone.now().date()
+        if date_str:
+            try:
+                pay_date = timezone.datetime.strptime(date_str, '%Y-%m-%d').date()
+            except ValueError:
+                pass
+
+        Expense.objects.create(
+            description=f"Payment from {payer.name} to {recipient.name}",
+            amount=amount,
+            category='General',
+            paid_by=payer,
+            payment_to=recipient,
+            date=pay_date,
+            notes=notes or "Settled via SplitFlow",
+            is_payment=True
+        )
+
+        messages.success(request, f"Recorded payment: {payer.name} paid {recipient.name} ${amount}!")
+        return redirect('splitwise_dashboard')
+
+    return redirect('splitwise_dashboard')
+
+
+def delete_expense(request, expense_id):
+    """Delete a shared expense or settlement payment."""
+    expense = get_object_or_404(Expense, id=expense_id)
+    desc = expense.description
+    amt = expense.amount
+
+    # If linked to a receipt, detach rather than delete receipt
+    if expense.receipt:
+        expense.receipt = None
+        expense.save()
+
+    expense.delete()
+    messages.info(request, f"Deleted '{desc}' (${amt}).")
+    return redirect('splitwise_dashboard')
+
+
+# ==========================================
+# SUPERSTORE INBOX & SPLITTER VIEWS
+# ==========================================
 
 @csrf_exempt
 def api_ingest_order(request):
@@ -24,16 +438,13 @@ def api_ingest_order(request):
         data = json.loads(request.body)
         html_content = data.get("html", "")
 
-        # Extract Order # from anywhere in the page first
         match = re.search(r"Order\s*#(\d+)", html_content)
         order_id = match.group(1) if match else "latest"
         filename = f"Superstore_Order_{order_id}.html"
 
-        # If .single-column-wrapper exists, save only that clean block; otherwise save full HTML
         soup = BeautifulSoup(html_content, "html.parser")
         wrappers = soup.select("div.single-column-wrapper")
         if wrappers:
-            # Only keep the wrapper if it actually has the cart items inside it
             combined = "\n".join(str(w) for w in wrappers)
             if "cart-entry-list__item" in combined:
                 html_content = combined
@@ -43,7 +454,6 @@ def api_ingest_order(request):
         with open(filepath, "w", encoding="utf-8") as f:
             f.write(html_content)
 
-        # If this receipt was previously archived or had 0 items, unarchive/refresh it
         existing = Receipt.objects.filter(filename=filename).first()
         if existing:
             if existing.items.count() == 0:
@@ -81,7 +491,10 @@ def delete_receipts_and_files(queryset):
                 os.remove(filepath)
             except OSError:
                 pass
+        # Also clean up any linked Expense
+        Expense.objects.filter(receipt=rec).delete()
     queryset.delete()
+
 
 def delete_receipt(request, receipt_id):
     receipt = get_object_or_404(Receipt, id=receipt_id)
@@ -91,6 +504,7 @@ def delete_receipt(request, receipt_id):
         return redirect(f"{reverse('receipt_list')}?archived=1")
     return redirect('receipt_list')
 
+
 def latex_escape(text):
     conv = {
         '&': r'\&', '%': r'\%', '$': r'\$', '#': r'\#',
@@ -98,6 +512,7 @@ def latex_escape(text):
         '^': r'\^{}', '\\': r'\textbackslash{}',
     }
     return ''.join(conv.get(c, c) for c in str(text))
+
 
 def receipt_list(request):
     sync_receipts_folder()
@@ -122,6 +537,7 @@ def receipt_list(request):
             elif action == 'reprocess':
                 ReceiptItem.objects.filter(receipt_id__in=selected_ids).update(is_assigned=False)
                 Receipt.objects.filter(id__in=selected_ids).update(processed=False)
+                Expense.objects.filter(receipt_id__in=selected_ids).delete()
                 return redirect(f"{reverse('batch_process')}?ids={ids_str}")
             elif action == 'summary':
                 return redirect(f"{reverse('batch_summary')}?ids={ids_str}")
@@ -136,11 +552,13 @@ def receipt_list(request):
         'archived_count': archived_count,
     })
 
+
 def toggle_archive_receipt(request, receipt_id):
     receipt = get_object_or_404(Receipt, id=receipt_id)
     receipt.is_archived = not receipt.is_archived
     receipt.save()
     return redirect('receipt_list')
+
 
 def batch_process(request):
     ensure_roommates()
@@ -149,7 +567,7 @@ def batch_process(request):
     if not receipt_ids:
         return redirect('receipt_list')
 
-    roommates = list(Roommate.objects.all())
+    roommates = list(Roommate.objects.filter(is_active=True))
     all_items = list(
         ReceiptItem.objects.filter(receipt_id__in=receipt_ids)
         .select_related('receipt')
@@ -169,6 +587,10 @@ def batch_process(request):
 
     if not item:
         Receipt.objects.filter(id__in=receipt_ids).update(processed=True)
+        for r_id in receipt_ids:
+            r_obj = Receipt.objects.filter(id=r_id).first()
+            if r_obj:
+                sync_receipt_to_expense(r_obj)
         return redirect(f"{reverse('batch_summary')}?ids={ids_param}")
 
     if request.method == 'POST':
@@ -187,16 +609,15 @@ def batch_process(request):
             if not item.receipt.items.filter(is_assigned=False).exists():
                 item.receipt.processed = True
                 item.receipt.save()
+                sync_receipt_to_expense(item.receipt)
 
             if return_to == 'summary':
                 return redirect(f"{reverse('batch_summary')}?ids={ids_param}")
             return redirect(f"{reverse('batch_process')}?ids={ids_param}")
 
-    # Find current index & Previous Item ID for the "<- Previous Item" button
     current_idx = all_items.index(item)
     prev_item = all_items[current_idx - 1] if current_idx > 0 else None
 
-    # Calculate running base totals across the batch (already-split items + 1/4 tax share)
     num_roommates = len(roommates)
     batch_receipts = Receipt.objects.filter(id__in=receipt_ids)
     total_batch_tax = sum((r.tax_amount for r in batch_receipts), Decimal('0.00'))
@@ -212,7 +633,6 @@ def batch_process(request):
             for s in shares:
                 base_totals[s.roommate_id] += other_item.total_price * (s.units / tot_u)
 
-    # Smart Item Memory (or load existing shares if editing a previous item)
     initial_units = {r.id: Decimal('0') for r in roommates}
     smart_matched = False
 
@@ -261,7 +681,7 @@ def batch_process(request):
 def build_summary_data(receipt_ids):
     sync_receipts_folder()
     receipts = Receipt.objects.filter(id__in=receipt_ids).order_by('file_modified_at', 'id')
-    roommates = list(Roommate.objects.all())
+    roommates = list(Roommate.objects.filter(is_active=True))
     num_roommates = len(roommates)
 
     overall_items = {r: Decimal('0.00') for r in roommates}
@@ -269,7 +689,6 @@ def build_summary_data(receipt_ids):
     receipt_reports = []
 
     for receipt in receipts:
-        # Keep exact unrounded running totals per receipt first
         r_items_exact = {r: Decimal('0.0000') for r in roommates}
         item_rows = []
         actual_items_sum = Decimal('0.00')
@@ -294,14 +713,11 @@ def build_summary_data(receipt_ids):
                 'splits_by_roommate': [splits_dict[r.name] for r in roommates],
             })
 
-        # Exact tax per person (e.g. 1.54 / 4 = 0.385)
         exact_tax_per_person = (
             (receipt.tax_amount / Decimal(num_roommates))
             if num_roommates > 0 else Decimal('0.00')
         )
         display_tax_per_person = exact_tax_per_person.quantize(Decimal('0.01'))
-
-        # True receipt total (actual item prices + actual tax)
         true_receipt_total = (actual_items_sum + receipt.tax_amount).quantize(Decimal('0.01'))
 
         roommate_subtotals = []
@@ -317,7 +733,6 @@ def build_summary_data(receipt_ids):
                 'total': person_total,
             })
 
-        # Adjust 1-2 cent rounding remainder on the payer (Het) so the 4 columns sum to true_receipt_total
         diff = true_receipt_total - sum(sub['total'] for sub in roommate_subtotals)
         if diff != Decimal('0.00') and roommate_subtotals:
             me_sub = next((s for s in roommate_subtotals if s['roommate'].is_me), roommate_subtotals[0])
@@ -331,7 +746,6 @@ def build_summary_data(receipt_ids):
             'receipt_grand_total': true_receipt_total,
         })
 
-    # Build final combined Splitwise cards
     summary_rows = []
     for r in roommates:
         items_sub = overall_items[r].quantize(Decimal('0.01'))
@@ -358,6 +772,7 @@ def build_summary_data(receipt_ids):
         'grand_total': true_grand_total,
     }
 
+
 def batch_summary(request):
     ids_param = request.GET.get('ids', '')
     receipt_ids = [int(x) for x in ids_param.split(',') if x.isdigit()]
@@ -368,11 +783,13 @@ def batch_summary(request):
         r_obj = get_object_or_404(Receipt, id=int(request.POST['receipt_id']))
         r_obj.tax_amount = Decimal(request.POST.get('tax_amount') or '0.00')
         r_obj.save()
+        sync_receipt_to_expense(r_obj)
         return redirect(f"{reverse('batch_summary')}?ids={ids_param}")
 
     data = build_summary_data(receipt_ids)
     data['ids_param'] = ids_param
     return render(request, 'splitter/summary.html', data)
+
 
 def export_latex_pdf(request):
     ids_param = request.GET.get('ids', '')
@@ -383,7 +800,6 @@ def export_latex_pdf(request):
     data = build_summary_data(receipt_ids)
     roommates = data['roommates']
 
-    # Build LaTeX source dynamically
     lines = [
         r"\documentclass[11pt,a4paper]{article}",
         r"\usepackage[utf8]{inputenc}",
@@ -415,7 +831,6 @@ def export_latex_pdf(request):
         r"\vspace{1.5em}",
     ]
 
-    # Per-receipt itemized tables
     col_spec = "p{5.2cm}rr" + ("r" * len(roommates))
     r_headers = " & ".join([f"\\textbf{{{latex_escape(r.name)}}}" for r in roommates])
 
@@ -452,7 +867,6 @@ def export_latex_pdf(request):
     lines.append(r"\end{document}")
     tex_source = "\n".join(lines)
 
-    # Compile to PDF via pdflatex
     with tempfile.TemporaryDirectory() as tmpdir:
         tex_path = os.path.join(tmpdir, "splitwise_summary.tex")
         pdf_path = os.path.join(tmpdir, "splitwise_summary.pdf")
@@ -469,7 +883,6 @@ def export_latex_pdf(request):
                 response["Content-Disposition"] = 'attachment; filename="Splitwise_Monthly_Summary.pdf"'
                 return response
         except (FileNotFoundError, subprocess.CalledProcessError):
-            # Fallback: download the .tex file if pdflatex encountered an issue
             response = HttpResponse(tex_source, content_type="text/plain")
             response["Content-Disposition"] = 'attachment; filename="Splitwise_Monthly_Summary.tex"'
             return response
@@ -479,96 +892,234 @@ def analytics_dashboard(request):
     sync_receipts_folder()
     ensure_roommates()
 
-    receipts = list(Receipt.objects.all().order_by('file_modified_at', 'id'))
-    roommates = list(Roommate.objects.all())
-    num_roommates = len(roommates)
+    active_tab = request.GET.get("tab", "household")
+    if active_tab not in ["household", "superstore"]:
+        active_tab = "household"
 
-    roommate_totals = {r.name: Decimal('0.00') for r in roommates}
+    active_roommates = list(Roommate.objects.filter(is_active=True))
+
+    # ==========================================
+    # 1. HOUSEHOLD & SPLITWISE DATA (1,369 records)
+    # ==========================================
+    splitwise_expenses = list(
+        Expense.objects.filter(is_payment=False)
+        .select_related("paid_by")
+        .prefetch_related("splits__roommate")
+        .order_by("date")
+    )
+
+    total_household_spent = Decimal("0.00")
+    cat_totals = defaultdict(Decimal)
+    cat_counts = defaultdict(int)
+    monthly_totals = defaultdict(Decimal)
+    monthly_dates = {}
+
+    payer_totals = {r.name: Decimal("0.00") for r in active_roommates}
+    share_totals = {r.name: Decimal("0.00") for r in active_roommates}
+
+    for exp in splitwise_expenses:
+        total_household_spent += exp.amount
+        cat_totals[exp.category] += exp.amount
+        cat_counts[exp.category] += 1
+
+        m_key = exp.date.strftime("%Y-%m")
+        monthly_totals[m_key] += exp.amount
+        if m_key not in monthly_dates:
+            monthly_dates[m_key] = exp.date
+
+        if exp.paid_by.name in payer_totals:
+            payer_totals[exp.paid_by.name] += exp.amount
+
+        for sp in exp.splits.all():
+            if sp.roommate.name in share_totals:
+                share_totals[sp.roommate.name] += sp.amount
+
+    sorted_months = sorted(monthly_totals.keys())
+    month_labels = [monthly_dates[m].strftime("%b '%y") for m in sorted_months]
+    month_totals_float = [float(monthly_totals[m]) for m in sorted_months]
+
+    # Category breakdown sorted descending
+    sorted_categories = sorted(
+        [
+            {
+                "name": cat,
+                "amount": amt.quantize(Decimal("0.01")),
+                "count": cat_counts[cat],
+                "pct": round((float(amt) / float(total_household_spent) * 100), 1) if total_household_spent > 0 else 0
+            }
+            for cat, amt in cat_totals.items()
+        ],
+        key=lambda x: x["amount"],
+        reverse=True
+    )
+
+    # Roommate comparisons
+    roommate_comparisons = []
+    for r in active_roommates:
+        paid = payer_totals[r.name].quantize(Decimal("0.01"))
+        share = share_totals[r.name].quantize(Decimal("0.01"))
+        diff = (paid - share).quantize(Decimal("0.01"))
+        pct = round((float(share) / float(total_household_spent) * 100), 1) if total_household_spent > 0 else 0
+        roommate_comparisons.append({
+            "roommate": r,
+            "paid": paid,
+            "share": share,
+            "net_diff": diff,
+            "pct": pct,
+        })
+
+    # Top largest household expenses
+    top_household_expenses = list(
+        Expense.objects.filter(is_payment=False)
+        .select_related("paid_by")
+        .order_by("-amount")[:10]
+    )
+
+    household_count = len(splitwise_expenses)
+    active_months_count = len(sorted_months)
+    monthly_avg_spend = (
+        (total_household_spent / Decimal(active_months_count)).quantize(Decimal("0.01"))
+        if active_months_count else Decimal("0.00")
+    )
+
+    top_cat = sorted_categories[0] if sorted_categories else {"name": "General", "amount": Decimal("0.00"), "pct": 0}
+    top_payer_name = max(payer_totals.items(), key=lambda x: x[1])[0] if payer_totals else "N/A"
+    top_payer_amount = payer_totals.get(top_payer_name, Decimal("0.00")).quantize(Decimal("0.01"))
+
+    household_chart_payload = {
+        "months": month_labels,
+        "monthly_totals": month_totals_float,
+        "cat_labels": [c["name"] for c in sorted_categories],
+        "cat_totals": [float(c["amount"]) for c in sorted_categories],
+        "roommate_labels": [r.name for r in active_roommates],
+        "roommate_paid": [float(payer_totals[r.name]) for r in active_roommates],
+        "roommate_share": [float(share_totals[r.name]) for r in active_roommates],
+    }
+
+    # ==========================================
+    # 2. SUPERSTORE GROCERY RECEIPT DATA
+    # ==========================================
+    receipts = list(Receipt.objects.all().order_by("file_modified_at", "id"))
+    num_active_rms = len(active_roommates)
+
+    superstore_totals = {r.name: Decimal("0.00") for r in active_roommates}
     bill_labels = []
     bill_totals = []
-    bill_roommate_series = {r.name: [] for r in roommates}
-    product_stats = defaultdict(lambda: {'spent': Decimal('0.00'), 'count': 0, 'img': None})
+    bill_roommate_series = {r.name: [] for r in active_roommates}
+    product_stats = defaultdict(lambda: {"spent": Decimal("0.00"), "count": 0, "img": None})
 
-    total_spent = Decimal('0.00')
-    total_tax = Decimal('0.00')
-    total_items_count = 0
+    superstore_spent = Decimal("0.00")
+    superstore_tax = Decimal("0.00")
+    superstore_items_count = 0
 
     for receipt in receipts:
-        items = list(receipt.items.prefetch_related('shares__roommate'))
+        items = list(receipt.items.prefetch_related("shares__roommate"))
         if not items:
             continue
 
-        items_sum = sum((i.total_price for i in items), Decimal('0.00'))
-        bill_total = (items_sum + receipt.tax_amount).quantize(Decimal('0.01'))
-        total_spent += bill_total
-        total_tax += receipt.tax_amount
-        total_items_count += len(items)
+        items_sum = sum((i.total_price for i in items), Decimal("0.00"))
+        bill_total = (items_sum + receipt.tax_amount).quantize(Decimal("0.01"))
+        superstore_spent += bill_total
+        superstore_tax += receipt.tax_amount
+        superstore_items_count += len(items)
 
-        # Clean label for X-axis (e.g. "March 19" or short order ID)
         if receipt.order_date_str:
-            label = receipt.order_date_str.split(',')[0].strip()
+            label = receipt.order_date_str.split(",")[0].strip()
         else:
-            label = receipt.filename.replace('Superstore_Order_', '#').replace('.html', '')[-6:]
+            label = receipt.filename.replace("Superstore_Order_", "#").replace(".html", "")[-6:]
         bill_labels.append(label)
         bill_totals.append(float(bill_total))
 
-        r_exact = {r.name: Decimal('0.0000') for r in roommates}
+        r_exact = {r.name: Decimal("0.0000") for r in active_roommates}
         for item in items:
             key = item.name.strip()
-            product_stats[key]['spent'] += item.total_price
-            product_stats[key]['count'] += 1
-            if item.image_url and not product_stats[key]['img']:
-                product_stats[key]['img'] = item.image_url
+            product_stats[key]["spent"] += item.total_price
+            product_stats[key]["count"] += 1
+            if item.image_url and not product_stats[key]["img"]:
+                product_stats[key]["img"] = item.image_url
 
             tot_units = sum(s.units for s in item.shares.all())
             if tot_units > 0:
                 for s in item.shares.all():
-                    r_exact[s.roommate.name] += item.total_price * (s.units / tot_units)
+                    if s.roommate.name in r_exact:
+                        r_exact[s.roommate.name] += item.total_price * (s.units / tot_units)
 
-        tax_share = (receipt.tax_amount / Decimal(num_roommates)) if num_roommates else Decimal('0.00')
-        for r in roommates:
-            person_bill = (r_exact[r.name] + tax_share).quantize(Decimal('0.01'))
-            roommate_totals[r.name] += person_bill
+        tax_share = (receipt.tax_amount / Decimal(num_active_rms)) if num_active_rms else Decimal("0.00")
+        for r in active_roommates:
+            person_bill = (r_exact[r.name] + tax_share).quantize(Decimal("0.01"))
+            superstore_totals[r.name] += person_bill
             bill_roommate_series[r.name].append(float(person_bill))
 
     top_products = sorted(
-        [{'name': k, 'spent': v['spent'].quantize(Decimal('0.01')), 'count': v['count'], 'img': v['img']}
+        [{"name": k, "spent": v["spent"].quantize(Decimal("0.01")), "count": v["count"], "img": v["img"]}
          for k, v in product_stats.items()],
-        key=lambda x: x['spent'],
+        key=lambda x: x["spent"],
         reverse=True
     )[:8]
 
-    max_product_spent = top_products[0]['spent'] if top_products else Decimal('1.00')
+    max_product_spent = top_products[0]["spent"] if top_products else Decimal("1.00")
     for p in top_products:
-        p['pct'] = int((p['spent'] / max_product_spent) * 100) if max_product_spent > 0 else 0
+        p["pct"] = int((p["spent"] / max_product_spent) * 100) if max_product_spent > 0 else 0
 
     bill_count = len(bill_labels)
-    avg_bill = (total_spent / Decimal(bill_count)).quantize(Decimal('0.01')) if bill_count else Decimal('0.00')
+    superstore_avg_bill = (superstore_spent / Decimal(bill_count)).quantize(Decimal("0.01")) if bill_count else Decimal("0.00")
 
-    roommate_cards = []
-    for r in roommates:
-        amt = roommate_totals[r.name].quantize(Decimal('0.01'))
-        pct = round((float(amt) / float(total_spent)) * 100, 1) if total_spent > 0 else 0
-        roommate_cards.append({'roommate': r, 'total': amt, 'pct': pct})
+    superstore_roommate_cards = []
+    for r in active_roommates:
+        amt = superstore_totals[r.name].quantize(Decimal("0.01"))
+        pct = round((float(amt) / float(superstore_spent)) * 100, 1) if superstore_spent > 0 else 0
+        superstore_roommate_cards.append({"roommate": r, "total": amt, "pct": pct})
 
-    chart_payload = {
-        'labels': bill_labels,
-        'bill_totals': bill_totals,
-        'roommate_names': [r.name for r in roommates],
-        'roommate_totals': [float(roommate_totals[r.name]) for r in roommates],
-        'roommate_series': [
-            {'name': r.name, 'data': bill_roommate_series[r.name]}
-            for r in roommates
+    superstore_chart_payload = {
+        "labels": bill_labels,
+        "bill_totals": bill_totals,
+        "roommate_names": [r.name for r in active_roommates],
+        "roommate_totals": [float(superstore_totals[r.name]) for r in active_roommates],
+        "roommate_series": [
+            {"name": r.name, "data": bill_roommate_series[r.name]}
+            for r in active_roommates
         ],
     }
 
-    return render(request, 'splitter/analytics.html', {
-        'total_spent': total_spent.quantize(Decimal('0.01')),
-        'total_tax': total_tax.quantize(Decimal('0.01')),
-        'avg_bill': avg_bill,
-        'bill_count': bill_count,
-        'total_items_count': total_items_count,
-        'roommate_cards': roommate_cards,
-        'top_products': top_products,
-        'chart_json': json.dumps(chart_payload),
+    return render(request, "splitter/analytics.html", {
+        "active_tab": active_tab,
+        # Household stats
+        "total_household_spent": total_household_spent.quantize(Decimal("0.01")),
+        "household_count": household_count,
+        "active_months_count": active_months_count,
+        "monthly_avg_spend": monthly_avg_spend,
+        "top_cat": top_cat,
+        "top_payer_name": top_payer_name,
+        "top_payer_amount": top_payer_amount,
+        "sorted_categories": sorted_categories,
+        "roommate_comparisons": roommate_comparisons,
+        "top_household_expenses": top_household_expenses,
+        "household_chart_json": json.dumps(household_chart_payload),
+        # Superstore stats
+        "superstore_spent": superstore_spent.quantize(Decimal("0.01")),
+        "superstore_tax": superstore_tax.quantize(Decimal("0.01")),
+        "superstore_avg_bill": superstore_avg_bill,
+        "bill_count": bill_count,
+        "superstore_items_count": superstore_items_count,
+        "superstore_roommate_cards": superstore_roommate_cards,
+        "top_products": top_products,
+        "superstore_chart_json": json.dumps(superstore_chart_payload),
     })
+
+
+def manifest_view(request):
+    """Serve PWA web app manifest with root scope."""
+    manifest_path = os.path.join(settings.BASE_DIR, "rcsscrapper", "static", "manifest.json")
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    return HttpResponse(content, content_type="application/manifest+json")
+
+
+def service_worker_view(request):
+    """Serve PWA Service Worker script with root scope permission."""
+    sw_path = os.path.join(settings.BASE_DIR, "rcsscrapper", "static", "sw.js")
+    with open(sw_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    response = HttpResponse(content, content_type="application/javascript")
+    response["Service-Worker-Allowed"] = "/"
+    return response

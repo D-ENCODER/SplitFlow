@@ -11,13 +11,35 @@ INBOX_DIR = os.path.join(settings.BASE_DIR, 'rcsscrapper', 'receipts_inbox')
 
 
 def ensure_roommates():
-    if not Roommate.objects.exists():
-        Roommate.objects.bulk_create([
-            Roommate(name='Het', is_me=True),
-            Roommate(name='Ruchit'),
-            Roommate(name='Tirth'),
-            Roommate(name='Maurya'),
-        ])
+    from django.contrib.auth.models import User
+
+    profiles = [
+        {'name': 'Het', 'username': 'het', 'is_me': True, 'is_admin': True},
+        {'name': 'Ruchit', 'username': 'ruchit', 'is_me': False, 'is_admin': False},
+        {'name': 'Tirth', 'username': 'tirth', 'is_me': False, 'is_admin': False},
+        {'name': 'Maurya', 'username': 'maurya', 'is_me': False, 'is_admin': False},
+    ]
+
+    for p in profiles:
+        user = User.objects.filter(username=p['username']).first()
+        if not user:
+            user = User.objects.create_user(
+                username=p['username'],
+                email=f"{p['username']}@splitflow.local",
+                password='admin'
+            )
+            if p['is_admin']:
+                user.is_superuser = True
+                user.is_staff = True
+                user.save()
+
+        rm, _ = Roommate.objects.get_or_create(name=p['name'])
+        if rm.user != user or rm.is_me != p['is_me'] or not rm.email or not rm.is_active:
+            rm.user = user
+            rm.is_me = p['is_me']
+            rm.email = user.email
+            rm.is_active = True
+            rm.save()
 
 
 def parse_tax_from_soup(soup):

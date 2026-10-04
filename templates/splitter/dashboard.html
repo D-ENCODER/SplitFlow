@@ -1,0 +1,483 @@
+{% extends "splitter/base.html" %}
+{% block content %}
+<div class="space-y-6">
+  <!-- Top Splitwise Hero Bar -->
+  <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-5 sm:p-7">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-5">
+      <div>
+        <div class="flex items-center gap-2 mb-1.5">
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300">
+            <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+            Household Splitwise Ledger
+          </span>
+          <span class="text-xs text-slate-400">Viewing as <strong>{{ active_roommate.name }}</strong></span>
+        </div>
+        
+        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+          {% if user_summary.total_net > 0 %}
+            <span class="text-emerald-600 dark:text-emerald-400">You are owed ${{ user_summary.total_net }}</span> overall
+          {% elif user_summary.total_net < 0 %}
+            <span class="text-amber-600 dark:text-amber-400">You owe ${{ user_summary.total_net|stringformat:".2f"|slice:"1:" }}</span> overall
+          {% else %}
+            <span class="text-slate-700 dark:text-slate-300">You are all settled up!</span>
+          {% endif %}
+        </h1>
+        
+        <div class="flex flex-wrap items-center gap-4 mt-2 text-xs font-medium">
+          <div class="text-slate-500 dark:text-slate-400">
+            Total you owe: <span class="font-bold text-slate-700 dark:text-slate-200">${{ user_summary.total_user_owes }}</span>
+          </div>
+          <span class="text-slate-300 dark:text-slate-700">&bull;</span>
+          <div class="text-slate-500 dark:text-slate-400">
+            Total owed to you: <span class="font-bold text-slate-700 dark:text-slate-200">${{ user_summary.total_owed_to_user }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+        <button type="button" onclick="openExpenseModal()"
+                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold shadow-sm shadow-emerald-200 dark:shadow-none transition cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          Add an Expense
+        </button>
+        <button type="button" onclick="openSettleModal()"
+                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold shadow-sm shadow-indigo-200 dark:shadow-none transition cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+          Settle Up
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2-Column Splitwise Grid -->
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+    <!-- Left Column: Friends & Roommate Balances (4 cols) -->
+    <div class="lg:col-span-4 space-y-4">
+      <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-5">
+        <h2 class="text-base font-bold text-slate-900 dark:text-white mb-4 flex items-center justify-between">
+          <span>Roommate Balances</span>
+          <span class="text-xs font-normal text-slate-400">4 Roommates</span>
+        </h2>
+
+        <div class="space-y-3">
+          {% for fb in user_summary.friend_balances %}
+          <div class="p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold flex items-center justify-center text-sm shrink-0 border border-indigo-200 dark:border-indigo-800">
+                {{ fb.roommate.name|slice:":1" }}
+              </div>
+              <div class="min-w-0">
+                <div class="font-semibold text-sm text-slate-900 dark:text-white truncate">
+                  {{ fb.roommate.name }}
+                  {% if fb.roommate.is_me %}<span class="text-xs text-indigo-500 font-normal">(Me)</span>{% endif %}
+                </div>
+                <div class="text-xs">
+                  {% if fb.status == 'owes_you' %}
+                    <span class="text-emerald-600 dark:text-emerald-400 font-semibold">owes you ${{ fb.amount }}</span>
+                  {% elif fb.status == 'you_owe' %}
+                    <span class="text-amber-600 dark:text-amber-400 font-semibold">you owe ${{ fb.amount }}</span>
+                  {% else %}
+                    <span class="text-slate-400">settled up</span>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+
+            {% if fb.status != 'settled' %}
+              <button type="button"
+                      onclick="settleWith('{{ active_roommate.id }}', '{{ fb.roommate.id }}', '{{ fb.amount }}', '{{ fb.status }}')"
+                      class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 transition shrink-0 cursor-pointer">
+                Settle
+              </button>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Quick Superstore Card -->
+      <div class="bg-gradient-to-br from-indigo-500/10 to-indigo-600/5 dark:from-indigo-950/40 dark:to-slate-900 rounded-3xl border border-indigo-200/80 dark:border-indigo-900/60 p-5 space-y-3">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs">
+            RC
+          </div>
+          <div>
+            <h3 class="font-bold text-sm text-slate-900 dark:text-white">Real Canadian Superstore</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Automated Receipt Parser</p>
+          </div>
+        </div>
+        <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+          Drop your Superstore orders into the inbox. All items and equal taxes are parsed and synced directly into this Splitwise ledger!
+        </p>
+        <div class="pt-1 flex items-center justify-between text-xs font-semibold">
+          <span class="text-slate-500 dark:text-slate-400">{{ inbox_receipts_count }} receipt{{ inbox_receipts_count|pluralize }} on disk</span>
+          <a href="{% url 'receipt_list' %}" class="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:underline">
+            Open Superstore Inbox &rarr;
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Recent Shared Expenses & Settlements Feed (8 cols) -->
+    <div class="lg:col-span-8 space-y-4">
+      <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-5 sm:p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 class="text-lg font-bold text-slate-900 dark:text-white">Shared Expenses &amp; Activity</h2>
+            <p class="text-xs text-slate-400 mt-0.5">Chronological ledger of grocery splits, utility bills, and settlements</p>
+          </div>
+          <div class="flex items-center gap-1.5 text-xs font-semibold">
+            <span class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+              {{ total_expenses_count }} record{{ total_expenses_count|pluralize }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Search & Category Filters Bar -->
+        <div class="mb-4 space-y-2.5">
+          <form method="get" action="{% url 'splitwise_dashboard' %}" class="flex items-center gap-2">
+            <div class="relative flex-1">
+              <input type="text" name="q" value="{{ search_q }}" placeholder="Search description, notes, or roommate..."
+                     class="w-full pl-9 pr-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <svg class="w-4 h-4 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+              </svg>
+            </div>
+            {% if selected_cat %}
+              <input type="hidden" name="category" value="{{ selected_cat }}">
+            {% endif %}
+            <button type="submit" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition cursor-pointer">
+              Search
+            </button>
+            {% if search_q or selected_cat %}
+              <a href="{% url 'splitwise_dashboard' %}" class="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition">
+                Reset
+              </a>
+            {% endif %}
+          </form>
+
+          <!-- Category filter pills -->
+          <div class="flex flex-wrap items-center gap-1.5 text-xs">
+            <a href="?{% if search_q %}q={{ search_q }}&{% endif %}"
+               class="px-2.5 py-1 rounded-lg font-semibold transition {% if not selected_cat %}bg-indigo-600 text-white shadow-sm{% else %}bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white{% endif %}">
+              All
+            </a>
+            {% for cat in category_choices %}
+            <a href="?{% if search_q %}q={{ search_q }}&{% endif %}category={{ cat.0 }}"
+               class="px-2.5 py-1 rounded-lg font-semibold transition {% if selected_cat == cat.0 %}bg-indigo-600 text-white shadow-sm{% else %}bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white{% endif %}">
+              {{ cat.1 }}
+            </a>
+            {% endfor %}
+          </div>
+        </div>
+
+        {% if page_obj %}
+        <div class="divide-y divide-slate-100 dark:divide-slate-800/80">
+          {% for item in page_obj %}
+          {% with exp=item.expense %}
+          <div class="py-3.5 group hover:bg-slate-50/60 dark:hover:bg-slate-800/40 rounded-2xl px-2 transition">
+            <div class="flex items-center justify-between gap-4">
+              <!-- Left info: date + icon + title -->
+              <div class="flex items-center gap-3.5 min-w-0 flex-1">
+                <!-- Date badge -->
+                <div class="text-center w-11 shrink-0">
+                  <div class="text-[10px] font-bold uppercase text-slate-400">{{ exp.date|date:"M" }}</div>
+                  <div class="text-base font-extrabold text-slate-800 dark:text-slate-200 leading-none">{{ exp.date|date:"d" }}</div>
+                </div>
+
+                <!-- Category Icon -->
+                <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-lg shrink-0 {% if exp.is_payment %}bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600{% elif exp.category == 'Groceries' %}bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600{% elif exp.category == 'Utilities' %}bg-amber-50 dark:bg-amber-950/60 text-amber-600{% elif exp.category == 'Rent' %}bg-rose-50 dark:bg-rose-950/60 text-rose-600{% elif exp.category == 'Dining' %}bg-orange-50 dark:bg-orange-950/60 text-orange-600{% else %}bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300{% endif %}">
+                  {% if exp.is_payment %}&#128181;
+                  {% elif exp.category == 'Groceries' %}&#128722;
+                  {% elif exp.category == 'Utilities' %}&#128161;
+                  {% elif exp.category == 'Rent' %}&#127968;
+                  {% elif exp.category == 'Dining' %}&#127828;
+                  {% elif exp.category == 'Entertainment' %}&#127916;
+                  {% else %}&#128221;{% endif %}
+                </div>
+
+                <!-- Description & payer -->
+                <div class="min-w-0 flex-1">
+                  <div class="font-bold text-sm text-slate-900 dark:text-white truncate">
+                    {{ exp.description }}
+                  </div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    {% if exp.is_payment %}
+                      {{ exp.paid_by.name }} paid {{ exp.payment_to.name }} ${{ exp.amount }}
+                    {% else %}
+                      {{ exp.paid_by.name }} paid ${{ exp.amount }}
+                      {% if exp.receipt %}
+                        &bull; <a href="{% url 'batch_summary' %}?ids={{ exp.receipt.id }}" class="text-indigo-600 dark:text-indigo-400 hover:underline">View Receipt Matrix</a>
+                      {% endif %}
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right: Viewer impact + Quick actions -->
+              <div class="text-right shrink-0 flex items-center gap-3">
+                <div>
+                  <div class="text-xs uppercase font-semibold text-slate-400">
+                    {% if item.impact_type == 'lent' %}you lent
+                    {% elif item.impact_type == 'borrowed' %}you owe
+                    {% elif item.impact_type == 'paid' %}you paid
+                    {% elif item.impact_type == 'received' %}received
+                    {% else %}your share{% endif %}
+                  </div>
+                  <div class="font-mono text-sm font-bold {% if item.impact_type == 'lent' or item.impact_type == 'received' %}text-emerald-600 dark:text-emerald-400{% elif item.impact_type == 'borrowed' or item.impact_type == 'paid' %}text-amber-600 dark:text-amber-400{% else %}text-slate-500{% endif %}">
+                    {% if item.impact_type == 'lent' %}+${{ exp.amount|add:"0" }}
+                    {% elif item.impact_type == 'borrowed' %}-${{ item.viewer_share }}
+                    {% elif item.impact_type == 'paid' %}-${{ exp.amount }}
+                    {% elif item.impact_type == 'received' %}+${{ exp.amount }}
+                    {% else %}${{ item.viewer_share }}{% endif %}
+                  </div>
+                </div>
+
+                <!-- Delete button -->
+                <a href="{% url 'delete_expense' exp.id %}"
+                   onclick="return confirm('Delete {{ exp.description }}?');"
+                   class="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition"
+                   title="Delete expense">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </a>
+              </div>
+            </div>
+
+            <!-- Expandable Itemized Splits Pill Bar -->
+            {% if not exp.is_payment and exp.splits.all %}
+            <div class="mt-2 pl-14 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+              <span class="font-medium text-slate-400">Splits:</span>
+              {% for sp in exp.splits.all %}
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                {{ sp.roommate.name }}: ${{ sp.amount }}
+              </span>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </div>
+          {% endwith %}
+          {% endfor %}
+        </div>
+
+        {% if page_obj.has_other_pages %}
+        <div class="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+          <div class="text-slate-500 dark:text-slate-400">
+            Showing <span class="font-semibold text-slate-700 dark:text-slate-200">{{ page_obj.start_index }}–{{ page_obj.end_index }}</span> of <span class="font-semibold text-slate-700 dark:text-slate-200">{{ page_obj.paginator.count }}</span> records
+          </div>
+          <div class="flex items-center gap-1.5">
+            {% if page_obj.has_previous %}
+              <a href="?page=1{% if search_q %}&q={{ search_q }}{% endif %}{% if selected_cat %}&category={{ selected_cat }}{% endif %}" class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold transition">&laquo; First</a>
+              <a href="?page={{ page_obj.previous_page_number }}{% if search_q %}&q={{ search_q }}{% endif %}{% if selected_cat %}&category={{ selected_cat }}{% endif %}" class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold transition">&lsaquo; Prev</a>
+            {% endif %}
+            <span class="px-3 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+              <a href="?page={{ page_obj.next_page_number }}{% if search_q %}&q={{ search_q }}{% endif %}{% if selected_cat %}&category={{ selected_cat }}{% endif %}" class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold transition">Next &rsaquo;</a>
+              <a href="?page={{ page_obj.paginator.num_pages }}{% if search_q %}&q={{ search_q }}{% endif %}{% if selected_cat %}&category={{ selected_cat }}{% endif %}" class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold transition">Last &raquo;</a>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="py-12 text-center text-slate-400">
+          <p class="text-sm">No expenses or settlements recorded yet.</p>
+          <p class="text-xs mt-1">Click <strong>Add an Expense</strong> above or import a Superstore receipt to get started!</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL: ADD AN EXPENSE -->
+<!-- ======================================================== -->
+<div id="expense-modal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+  <div class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 sm:p-7 space-y-5 animate-card-enter">
+    <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+      <div>
+        <h3 class="text-lg font-bold text-slate-900 dark:text-white">Add a Shared Expense</h3>
+        <p class="text-xs text-slate-400">Split automatically among roommates</p>
+      </div>
+      <button type="button" onclick="closeExpenseModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition">
+        &times;
+      </button>
+    </div>
+
+    <form method="post" action="{% url 'add_expense' %}" class="space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Description</label>
+        <input type="text" name="description" required placeholder="e.g. Wi-Fi bill, Household supplies, Pizza"
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Total Amount ($)</label>
+          <input type="number" step="0.01" min="0.01" name="amount" required placeholder="0.00"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Category</label>
+          <select name="category" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            {% for cat_val, cat_label in category_choices %}
+              <option value="{{ cat_val }}">{{ cat_label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Paid By</label>
+          <select name="paid_by" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            {% for r in all_roommates %}
+              <option value="{{ r.id }}" {% if r.id == active_roommate.id %}selected{% endif %}>{{ r.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Date</label>
+          <input type="date" name="date" value="{{ today|date:'Y-m-d' }}"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+      </div>
+
+      <!-- Split Among Roommates -->
+      <div>
+        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">Split Equally Among</label>
+        <div class="grid grid-cols-2 gap-2">
+          {% for r in all_roommates %}
+          <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 cursor-pointer">
+            <input type="checkbox" name="split_roommates" value="{{ r.id }}" checked
+                   class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+            <span class="text-xs font-semibold text-slate-800 dark:text-slate-200">{{ r.name }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="pt-2 flex items-center justify-end gap-2.5 border-t border-slate-100 dark:border-slate-800">
+        <button type="button" onclick="closeExpenseModal()"
+                class="px-4 py-2.5 rounded-xl text-sm font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+          Cancel
+        </button>
+        <button type="submit"
+                class="px-5 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm transition">
+          Save Expense
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL: SETTLE UP -->
+<!-- ======================================================== -->
+<div id="settle-modal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+  <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 sm:p-7 space-y-5 animate-card-enter">
+    <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+      <div>
+        <h3 class="text-lg font-bold text-slate-900 dark:text-white">Record a Payment</h3>
+        <p class="text-xs text-slate-400">Settle debts between roommates</p>
+      </div>
+      <button type="button" onclick="closeSettleModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition">
+        &times;
+      </button>
+    </div>
+
+    <form method="post" action="{% url 'settle_up' %}" class="space-y-4">
+      {% csrf_token %}
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Who Paid?</label>
+          <select id="settle_payer" name="payer_id" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            {% for r in all_roommates %}
+              <option value="{{ r.id }}" {% if r.id == active_roommate.id %}selected{% endif %}>{{ r.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Who Was Paid?</label>
+          <select id="settle_recipient" name="recipient_id" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            {% for r in all_roommates %}
+              <option value="{{ r.id }}" {% if forloop.counter == 2 %}selected{% endif %}>{{ r.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Amount ($)</label>
+        <input id="settle_amount" type="number" step="0.01" min="0.01" name="amount" required placeholder="0.00"
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Payment Method / Note</label>
+        <input type="text" name="notes" placeholder="e.g. Interac e-Transfer, Cash, PayPal"
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+
+      <div class="pt-2 flex items-center justify-end gap-2.5 border-t border-slate-100 dark:border-slate-800">
+        <button type="button" onclick="closeSettleModal()"
+                class="px-4 py-2.5 rounded-xl text-sm font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+          Cancel
+        </button>
+        <button type="submit"
+                class="px-5 py-2.5 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition">
+          Record Payment
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function openExpenseModal() {
+    document.getElementById('expense-modal').classList.remove('hidden');
+  }
+  function closeExpenseModal() {
+    document.getElementById('expense-modal').classList.add('hidden');
+  }
+  function openSettleModal() {
+    document.getElementById('settle-modal').classList.remove('hidden');
+  }
+  function closeSettleModal() {
+    document.getElementById('settle-modal').classList.add('hidden');
+  }
+
+  function settleWith(myId, friendId, amount, status) {
+    const payerSelect = document.getElementById('settle_payer');
+    const recipientSelect = document.getElementById('settle_recipient');
+    const amountInput = document.getElementById('settle_amount');
+
+    if (status === 'owes_you') {
+      // Friend owes me: Friend is paying me
+      payerSelect.value = friendId;
+      recipientSelect.value = myId;
+    } else {
+      // I owe friend: I am paying friend
+      payerSelect.value = myId;
+      recipientSelect.value = friendId;
+    }
+    amountInput.value = amount;
+    openSettleModal();
+  }
+
+  // Close modals on Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeExpenseModal();
+      closeSettleModal();
+    }
+  });
+</script>
+{% endblock %}

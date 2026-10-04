@@ -1,50 +1,449 @@
 <!DOCTYPE html>
-<html lang="en" class="bg-slate-50 text-slate-900 antialiased">
+<html lang="en" class="h-full antialiased">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SplitFlow — Superstore Bill Splitter</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>SplitFlow — Household Ledger &amp; Bill Analytics</title>
+  
+  <!-- PWA Web App Manifest & Metadata -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#4f46e5" id="meta-theme-color">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SplitFlow">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="application-name" content="SplitFlow">
+  <meta name="description" content="Household expense tracking, Splitwise debt settlement, and automated Superstore receipt splitting">
+
+  <!-- Icons for iOS, Android, and Desktop -->
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon.png">
+  <link rel="icon" type="image/svg+xml" href="/static/icons/icon.svg">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <script>
+    // 1. Determine theme immediately before paint to prevent flash of wrong theme (FOUC)
+    try {
+      var userTheme = localStorage.getItem('theme');
+      var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (userTheme === 'dark' || (!userTheme && systemDark)) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    } catch (e) {
+      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.classList.add('dark');
+      }
+    }
+  </script>
+
+  <!-- Load Tailwind Play CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Configure Tailwind AFTER CDN loads so darkMode: 'class' is registered -->
   <script>
     tailwind.config = {
+      darkMode: 'class',
       theme: {
         extend: {
           fontFamily: { sans: ['Inter', 'sans-serif'] }
         }
       }
-    }
+    };
   </script>
+
+  <style>
+    :root {
+      color-scheme: light;
+      --sat: env(safe-area-inset-top, 0px);
+      --sab: env(safe-area-inset-bottom, 0px);
+    }
+    html {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    html.dark {
+      color-scheme: dark;
+      background-color: #020617 !important;
+      color: #f8fafc !important;
+    }
+    html.dark body {
+      background-color: #020617 !important;
+      color: #f8fafc !important;
+    }
+    html:not(.dark) {
+      color-scheme: light;
+      background-color: #f8fafc !important;
+      color: #0f172a !important;
+    }
+    html:not(.dark) body {
+      background-color: #f8fafc !important;
+      color: #0f172a !important;
+    }
+    body {
+      transition: background-color 0.2s ease, color 0.2s ease;
+      padding-top: var(--sat);
+      padding-bottom: calc(var(--sab) + 4.5rem);
+    }
+    @media (min-width: 640px) {
+      body {
+        padding-bottom: var(--sab);
+      }
+    }
+  </style>
 </head>
-<body class="min-h-screen flex flex-col">
+<body class="min-h-screen flex flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
   <!-- Top Glassmorphic Navbar -->
-  <header class="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200">
-    <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-      <a href="{% url 'receipt_list' %}" class="flex items-center gap-2.5 group">
-        <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold shadow-sm shadow-indigo-200 group-hover:bg-indigo-500 transition">
+  <header class="sticky top-0 z-40 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors duration-200">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4">
+      
+      <!-- Left: Logo & Brand -->
+      <a href="{% url 'splitwise_dashboard' %}" class="flex items-center gap-2.5 group shrink-0">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-500 flex items-center justify-center text-white font-black text-base shadow-sm shadow-indigo-300 dark:shadow-indigo-950 group-hover:scale-105 transition-transform">
           S
         </div>
-        <div>
-          <span class="font-bold text-lg tracking-tight text-slate-900">SplitFlow</span>
-          <span class="hidden sm:inline-block ml-2 text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">Superstore &rarr; Splitwise</span>
+        <div class="flex items-center gap-1.5">
+          <span class="font-bold text-lg tracking-tight text-slate-900 dark:text-white">SplitFlow</span>
+          <span class="hidden md:inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-800/40">
+            Household
+          </span>
         </div>
       </a>
-      <nav class="flex items-center gap-5 text-sm font-medium">
-        <a href="{% url 'receipt_list' %}" class="text-slate-600 hover:text-indigo-600 transition">Inbox</a>
-        <a href="{% url 'receipt_list' %}?archived=1" class="text-slate-600 hover:text-indigo-600 transition">Archived</a>
-          <a href="{% url 'analytics_dashboard' %}" class="hover:text-indigo-600 transition flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
-            <span>Analytics</span>
-          </a>
+
+      <!-- Center: Desktop Navigation Tabs -->
+      <nav class="hidden sm:flex items-center gap-1.5 text-sm font-semibold">
+        <!-- Dashboard / Ledger -->
+        <a href="{% url 'splitwise_dashboard' %}"
+           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'splitwise_dashboard' %}bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 font-bold{% else %}text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60{% endif %}">
+          <svg class="w-4 h-4 shrink-0 {% if request.resolver_match.url_name == 'splitwise_dashboard' %}text-indigo-600 dark:text-indigo-400{% else %}text-slate-400 dark:text-slate-500{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+          </svg>
+          <span>Ledger</span>
+        </a>
+
+        <!-- Analytics -->
+        <a href="{% url 'analytics_dashboard' %}"
+           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'analytics_dashboard' %}bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 font-bold{% else %}text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60{% endif %}">
+          <svg class="w-4 h-4 shrink-0 {% if request.resolver_match.url_name == 'analytics_dashboard' %}text-indigo-600 dark:text-indigo-400{% else %}text-slate-400 dark:text-slate-500{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          <span>Analytics</span>
+        </a>
+
+        <!-- Superstore Grocery Inbox -->
+        <a href="{% url 'receipt_list' %}"
+           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all {% if request.resolver_match.url_name in 'receipt_list,batch_process,batch_summary' %}bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 font-bold{% else %}text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60{% endif %}">
+          <svg class="w-4 h-4 shrink-0 {% if request.resolver_match.url_name in 'receipt_list,batch_process,batch_summary' %}text-indigo-600 dark:text-indigo-400{% else %}text-slate-400 dark:text-slate-500{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+          <span>Superstore Inbox</span>
+          {% if nav_pending_receipts_count > 0 %}
+          <span class="w-4 h-4 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center animate-pulse">
+            {{ nav_pending_receipts_count }}
+          </span>
+          {% endif %}
+        </a>
       </nav>
+
+      <!-- Right: PWA Install Chip, Dark Mode Toggle & Roommate Profile Switcher -->
+      <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+        
+        <!-- PWA Install Button (Appears when browser triggers beforeinstallprompt) -->
+        <button id="pwa-install-btn"
+                type="button"
+                onclick="installPWA()"
+                class="hidden items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold shadow-sm shadow-emerald-500/20 hover:brightness-110 transition cursor-pointer">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          <span class="hidden sm:inline">Install App</span>
+        </button>
+
+        <!-- Dark / Light Mode Toggle Switch -->
+        <button id="theme-toggle-btn"
+                type="button"
+                role="switch"
+                onclick="toggleTheme()"
+                aria-checked="false"
+                aria-label="Toggle dark mode"
+                title="Toggle dark mode"
+                class="relative inline-flex h-8 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-700 transition-colors duration-200 ease-in-out focus:outline-none">
+          <span class="sr-only">Toggle dark mode</span>
+          <span class="absolute inset-0 flex h-full w-full items-center justify-between px-2 text-xs pointer-events-none select-none">
+            <span class="text-amber-500 flex items-center justify-center">
+              <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/>
+              </svg>
+            </span>
+            <span class="text-indigo-300 flex items-center justify-center">
+              <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/>
+              </svg>
+            </span>
+          </span>
+
+          <span id="theme-toggle-thumb"
+                class="pointer-events-none relative inline-flex h-7 w-7 transform items-center justify-center rounded-full bg-white dark:bg-slate-900 shadow-md ring-0 transition-transform duration-200 ease-in-out text-amber-500 dark:text-indigo-400">
+            <svg id="theme-sun-icon" class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/>
+            </svg>
+            <svg id="theme-moon-icon" class="h-4 w-4" style="display: none;" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/>
+            </svg>
+          </span>
+        </button>
+
+        <!-- Roommate Profile Switcher Popover -->
+        <div class="relative" id="profile-menu-container">
+          <button type="button"
+                  id="profile-menu-btn"
+                  onclick="toggleProfileMenu()"
+                  class="flex items-center gap-1.5 p-1 pr-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer">
+            <span class="w-7 h-7 rounded-xl bg-indigo-600 text-white font-bold text-xs flex items-center justify-center">
+              {% if nav_current_roommate %}{{ nav_current_roommate.name|slice:":1"|upper }}{% else %}U{% endif %}
+            </span>
+            <span class="text-xs font-semibold text-slate-800 dark:text-slate-200 hidden sm:inline">
+              {% if nav_current_roommate %}{{ nav_current_roommate.name }}{% if nav_current_roommate.is_me %} (Me){% endif %}{% else %}Profile{% endif %}
+            </span>
+            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          <!-- Dropdown Popover -->
+          <div id="profile-dropdown"
+               class="hidden absolute right-0 mt-2 w-56 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl py-2 z-50 animate-card-enter">
+            <div class="px-3.5 py-1.5 border-b border-slate-100 dark:border-slate-800">
+              <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Switch Roommate</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">View balances &amp; activity as:</div>
+            </div>
+
+            <div class="py-1">
+              {% for rm in nav_active_roommates %}
+              <a href="{% url 'switch_profile' rm.user.username %}"
+                 class="flex items-center justify-between px-3.5 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 hover:text-indigo-600 dark:hover:text-indigo-300 transition">
+                <div class="flex items-center gap-2">
+                  <span class="w-6 h-6 rounded-lg bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold text-[10px] flex items-center justify-center">
+                    {{ rm.name|slice:":1" }}
+                  </span>
+                  <span>{{ rm.name }}{% if rm.is_me %} <span class="text-indigo-500 font-normal">(Me)</span>{% endif %}</span>
+                </div>
+                {% if nav_current_roommate and nav_current_roommate.id == rm.id %}
+                <span class="text-emerald-500 font-bold text-xs">&#10003;</span>
+                {% endif %}
+              </a>
+              {% endfor %}
+            </div>
+
+            <div class="border-t border-slate-100 dark:border-slate-800 pt-1 mt-1">
+              <a href="{% url 'logout' %}"
+                 class="flex items-center gap-2 px-3.5 py-1.5 text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                <span>Log out</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
+      </div>
     </div>
   </header>
 
+  <!-- Flash Messages -->
+  {% if messages %}
+    <div class="max-w-6xl w-full mx-auto px-4 sm:px-6 pt-4">
+      {% for m in messages %}
+        <div class="p-3.5 mb-2 rounded-xl text-sm font-medium flex items-center justify-between {% if m.tags == 'error' %}bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-200{% elif m.tags == 'success' %}bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-200{% else %}bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-900 text-indigo-800 dark:text-indigo-200{% endif %}">
+          <span>{{ m }}</span>
+          <button type="button" onclick="this.parentElement.remove()" class="text-xs opacity-60 hover:opacity-100 cursor-pointer">&times;</button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
   <!-- Main Content Container -->
-  <main class="flex-1 max-w-6xl w-full mx-auto px-6 py-8">
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
     {% block content %}{% endblock %}
   </main>
+
+  <!-- Mobile Native PWA Bottom Navigation Bar (Visible only on small screens) -->
+  <nav class="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 px-4 py-2 transition-colors">
+    <div class="flex items-center justify-around max-w-md mx-auto">
+      <!-- Ledger -->
+      <a href="{% url 'splitwise_dashboard' %}"
+         class="flex flex-col items-center gap-1 text-[11px] font-semibold {% if request.resolver_match.url_name == 'splitwise_dashboard' %}text-indigo-600 dark:text-indigo-400{% else %}text-slate-400 dark:text-slate-500{% endif %}">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+        </svg>
+        <span>Ledger</span>
+      </a>
+
+      <!-- Analytics -->
+      <a href="{% url 'analytics_dashboard' %}"
+         class="flex flex-col items-center gap-1 text-[11px] font-semibold {% if request.resolver_match.url_name == 'analytics_dashboard' %}text-indigo-600 dark:text-indigo-400{% else %}text-slate-400 dark:text-slate-500{% endif %}">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+        <span>Analytics</span>
+      </a>
+
+      <!-- Superstore Inbox -->
+      <a href="{% url 'receipt_list' %}"
+         class="relative flex flex-col items-center gap-1 text-[11px] font-semibold {% if request.resolver_match.url_name in 'receipt_list,batch_process,batch_summary' %}text-indigo-600 dark:text-indigo-400{% else %}text-slate-400 dark:text-slate-500{% endif %}">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        </svg>
+        <span>Inbox</span>
+        {% if nav_pending_receipts_count > 0 %}
+        <span class="absolute -top-1 -right-1.5 w-3.5 h-3.5 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center">
+          {{ nav_pending_receipts_count }}
+        </span>
+        {% endif %}
+      </a>
+
+      <!-- Quick Roommate Switcher -->
+      <button type="button"
+              onclick="toggleProfileMenu()"
+              class="flex flex-col items-center gap-1 text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+        <span class="w-5 h-5 rounded-full bg-indigo-600 text-white font-bold text-[10px] flex items-center justify-center">
+          {% if nav_current_roommate %}{{ nav_current_roommate.name|slice:":1"|upper }}{% else %}U{% endif %}
+        </span>
+        <span>Profile</span>
+      </button>
+    </div>
+  </nav>
+
+  <script>
+    // Profile Switcher Menu Toggle
+    function toggleProfileMenu() {
+      const menu = document.getElementById('profile-dropdown');
+      if (menu) {
+        menu.classList.toggle('hidden');
+      }
+    }
+
+    // Close menu when clicking outside
+    document.addEventListener('click', function(e) {
+      const container = document.getElementById('profile-menu-container');
+      const dropdown = document.getElementById('profile-dropdown');
+      if (container && dropdown && !container.contains(e.target)) {
+        dropdown.classList.add('hidden');
+      }
+    });
+
+    // Theme Switcher Sync & Logic
+    function syncToggleUI(isDark) {
+      var toggleBtn = document.getElementById('theme-toggle-btn');
+      var toggleThumb = document.getElementById('theme-toggle-thumb');
+      var sunIcon = document.getElementById('theme-sun-icon');
+      var moonIcon = document.getElementById('theme-moon-icon');
+      var metaTheme = document.getElementById('meta-theme-color');
+
+      if (metaTheme) {
+        metaTheme.setAttribute('content', isDark ? '#020617' : '#4f46e5');
+      }
+
+      if (toggleBtn) {
+        toggleBtn.setAttribute('aria-checked', isDark ? 'true' : 'false');
+        toggleBtn.setAttribute('title', isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode');
+        toggleBtn.style.backgroundColor = isDark ? '#334155' : '#cbd5e1';
+      }
+
+      if (toggleThumb) {
+        toggleThumb.style.transform = isDark ? 'translateX(24px)' : 'translateX(0px)';
+        toggleThumb.style.backgroundColor = isDark ? '#0f172a' : '#ffffff';
+      }
+
+      if (sunIcon && moonIcon) {
+        sunIcon.style.display = isDark ? 'none' : 'block';
+        moonIcon.style.display = isDark ? 'block' : 'none';
+      }
+    }
+
+    function toggleTheme() {
+      var isCurrentlyDark = document.documentElement.classList.contains('dark');
+      var nextThemeIsDark = !isCurrentlyDark;
+
+      if (nextThemeIsDark) {
+        document.documentElement.classList.add('dark');
+        try { localStorage.setItem('theme', 'dark'); } catch(e) {}
+      } else {
+        document.documentElement.classList.remove('dark');
+        try { localStorage.setItem('theme', 'light'); } catch(e) {}
+      }
+
+      syncToggleUI(nextThemeIsDark);
+      window.dispatchEvent(new CustomEvent('themeChanged', { detail: { isDark: nextThemeIsDark } }));
+    }
+
+    // Initialize toggle position on page load
+    (function() {
+      var initialDark = document.documentElement.classList.contains('dark');
+      syncToggleUI(initialDark);
+
+      try {
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+          if (!localStorage.getItem('theme')) {
+            if (e.matches) {
+              document.documentElement.classList.add('dark');
+            } else {
+              document.documentElement.classList.remove('dark');
+            }
+            syncToggleUI(e.matches);
+            window.dispatchEvent(new CustomEvent('themeChanged', { detail: { isDark: e.matches } }));
+          }
+        });
+      } catch(e) {}
+    })();
+
+    // PWA Service Worker Registration
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+          .then(function(reg) {
+            console.log('SplitFlow PWA ServiceWorker active with scope:', reg.scope);
+          })
+          .catch(function(err) {
+            console.warn('PWA registration error:', err);
+          });
+      });
+    }
+
+    // PWA Installation Prompt Logic
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', function(e) {
+      e.preventDefault();
+      deferredPrompt = e;
+      const installBtn = document.getElementById('pwa-install-btn');
+      if (installBtn) {
+        installBtn.classList.remove('hidden');
+        installBtn.classList.add('inline-flex');
+      }
+    });
+
+    function installPWA() {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(function(choiceResult) {
+        if (choiceResult.optin === 'accepted' || choiceResult.outcome === 'accepted') {
+          console.log('User installed SplitFlow PWA');
+        }
+        deferredPrompt = null;
+        const installBtn = document.getElementById('pwa-install-btn');
+        if (installBtn) installBtn.classList.add('hidden');
+      });
+    }
+
+    window.addEventListener('appinstalled', function() {
+      console.log('SplitFlow PWA installed successfully');
+      const installBtn = document.getElementById('pwa-install-btn');
+      if (installBtn) installBtn.classList.add('hidden');
+    });
+  </script>
 </body>
 </html>

@@ -28,13 +28,20 @@ def ensure_roommates():
             admin_user.save()
 
     # Admin profile linked to admin user
-    admin_rm, _ = Roommate.objects.get_or_create(
-        name='Admin',
-        defaults={'email': 'admin@splitflow.local', 'is_me': False, 'is_active': False, 'user': admin_user}
-    )
-    if admin_rm.user != admin_user:
-        admin_rm.user = admin_user
-        admin_rm.save()
+    admin_rm = getattr(admin_user, 'roommate', None)
+    if not admin_rm:
+        admin_rm = Roommate.objects.filter(name='Admin', user__isnull=True).first()
+        if not admin_rm:
+            admin_rm = Roommate.objects.create(
+                name='Admin',
+                user=admin_user,
+                email=admin_user.email or 'admin@splitflow.local',
+                is_me=False,
+                is_active=False
+            )
+        else:
+            admin_rm.user = admin_user
+            admin_rm.save()
 
     # 2. Ensure primary household roommates exist
     profiles = [
@@ -53,13 +60,25 @@ def ensure_roommates():
                 password='admin'
             )
 
-        rm, _ = Roommate.objects.get_or_create(name=p['name'])
-        if rm.user != user or rm.is_me != p['is_me'] or not rm.email or not rm.is_active:
-            rm.user = user
-            rm.is_me = p['is_me']
-            rm.email = user.email
-            rm.is_active = True
-            rm.save()
+        # Look up by user's existing roommate link first (prevents duplicate key errors if renamed)
+        rm = getattr(user, 'roommate', None)
+        if not rm:
+            # Check if there is an unlinked roommate with this name
+            rm = Roommate.objects.filter(name=p['name'], user__isnull=True).first()
+            if not rm:
+                rm = Roommate.objects.create(
+                    name=p['name'],
+                    user=user,
+                    email=user.email,
+                    is_me=p['is_me'],
+                    is_active=True
+                )
+            else:
+                rm.user = user
+                rm.is_me = p['is_me']
+                rm.email = user.email
+                rm.is_active = True
+                rm.save()
 
 
 def parse_tax_from_soup(soup):

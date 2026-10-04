@@ -16,8 +16,8 @@
   <meta name="description" content="Household expense tracking, Splitwise debt settlement, and automated Superstore receipt splitting">
 
   <!-- Icons for iOS, Android, and Desktop -->
-  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon.png">
+  <link rel="apple-touch-icon" href="/static/icons/splitflow_logo.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/splitflow_logo.png">
   <link rel="icon" type="image/svg+xml" href="/static/icons/icon.svg">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -102,10 +102,8 @@
       
       <!-- Left: Logo & Brand & Active Group Switcher -->
       <div class="flex items-center gap-2 sm:gap-3 shrink-0">
-        <a href="{% url 'splitwise_dashboard' %}" class="flex items-center gap-2 group shrink-0">
-          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-500 flex items-center justify-center text-white font-black text-base shadow-sm shadow-indigo-300 dark:shadow-indigo-950 group-hover:scale-105 transition-transform">
-            S
-          </div>
+        <a href="{% url 'splitwise_dashboard' %}" class="flex items-center gap-2.5 group shrink-0">
+          <img src="/static/icons/splitflow_logo.png" alt="SplitFlow Logo" class="w-9 h-9 rounded-xl object-contain shadow-sm shadow-emerald-500/20 group-hover:scale-105 transition-transform" />
           <span class="font-bold text-lg tracking-tight text-slate-900 dark:text-white hidden sm:inline-block">SplitFlow</span>
         </a>
 

@@ -101,9 +101,20 @@
             <tr class="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 group">
               <td class="py-3 pl-5 pr-3 font-medium text-slate-800 dark:text-slate-200">
                 <a href="{% url 'batch_process' %}?ids={{ ids_param }}&item_id={{ ir.item.id }}&from=summary"
-                   class="hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-2">
-                  <span>{{ ir.item.name }}</span>
-                  <span class="opacity-0 group-hover:opacity-100 text-[11px] font-semibold px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 transition">
+                   class="hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-3">
+                  {% if ir.item.image_url %}
+                    <img src="{{ ir.item.image_url }}" alt="{{ ir.item.name }}"
+                         class="w-9 h-9 rounded-xl object-contain bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-0.5 shrink-0 shadow-xs"
+                         loading="lazy" onerror="this.style.display='none'">
+                  {% else %}
+                    <div class="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-sm shrink-0">
+                      {% if 'deposit' in ir.item.name.lower or 'fee' in ir.item.name.lower %}♻️{% else %}🛒{% endif %}
+                    </div>
+                  {% endif %}
+                  <div class="min-w-0">
+                    <span class="block truncate">{{ ir.item.name }}</span>
+                  </div>
+                  <span class="opacity-0 group-hover:opacity-100 text-[11px] font-semibold px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 transition shrink-0">
                     Edit
                   </span>
                 </a>

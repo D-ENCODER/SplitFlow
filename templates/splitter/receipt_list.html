@@ -94,6 +94,20 @@
               <td class="py-4 px-4">
                 <div class="font-semibold text-slate-900 dark:text-slate-100">{{ r.filename }}</div>
                 <div class="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{{ r.items.count }} items parsed</div>
+                {% if r.items.all %}
+                <div class="flex items-center gap-1.5 mt-2">
+                  {% for item in r.items.all|slice:":6" %}
+                    {% if item.image_url %}
+                      <img src="{{ item.image_url }}" alt="{{ item.name }}" title="{{ item.name }}"
+                           class="w-6 h-6 rounded-md object-contain bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-0.5"
+                           loading="lazy" onerror="this.style.display='none'">
+                    {% endif %}
+                  {% endfor %}
+                  {% if r.items.count > 6 %}
+                    <span class="text-[10px] text-slate-400 font-semibold px-0.5">+{{ r.items.count|add:"-6" }}</span>
+                  {% endif %}
+                </div>
+                {% endif %}
               </td>
               <td class="py-4 px-4 text-slate-600 dark:text-slate-300">{{ r.order_date_str|default:"—" }}</td>
               <td class="py-4 px-4 text-slate-500 dark:text-slate-400 text-xs">{{ r.file_modified_at|date:"M d, Y H:i" }}</td>

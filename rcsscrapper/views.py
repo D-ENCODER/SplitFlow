@@ -701,9 +701,10 @@ def receipt_list(request):
                     return redirect(f"{reverse('receipt_list')}?archived=1")
                 return redirect('receipt_list')
             elif action == 'reprocess':
-                ReceiptItem.objects.filter(receipt_id__in=selected_ids).update(is_assigned=False)
+                ReceiptItem.objects.filter(receipt_id__in=selected_ids).delete()
                 Receipt.objects.filter(id__in=selected_ids).update(processed=False)
                 Expense.objects.filter(receipt_id__in=selected_ids).delete()
+                sync_receipts_folder(force_refresh=True)
                 return redirect(f"{reverse('batch_process')}?ids={ids_str}")
             elif action == 'summary':
                 return redirect(f"{reverse('batch_summary')}?ids={ids_str}")

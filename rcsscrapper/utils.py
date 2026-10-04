@@ -1,5 +1,6 @@
 import os
 import re
+import json
 from datetime import datetime
 from decimal import Decimal
 from bs4 import BeautifulSoup
@@ -122,20 +123,163 @@ def parse_tax_from_soup(soup):
 
 
 def parse_order_total_from_soup(soup):
-    for selector in [\
-        '.order-summary-total-item--trimmed__estimated-total .order-summary-total-item__values',\
-        '.inprogress-payment-summary__total .order-summary-total-item__values',\
-        '.preparing-order-summary .order-summary-sub-total__values',\
+    for selector in [
+        '.order-summary-total-item--trimmed__estimated-total .order-summary-total-item__values',
+        '.inprogress-payment-summary__total .order-summary-total-item__values',
+        '.inprogress-payment-summary__total',
+        '.order-dashboard-summary__total',
+        '.order-summary-total-item--trimmed__estimated-total',
+        '.preparing-order-summary .order-summary-sub-total__values',
     ]:
         el = soup.select_one(selector)
         if el:
             matches = re.findall(r'\d+\.\d{2}', el.get_text())
             if matches:
                 return Decimal(matches[-1])
+
+    # Text-based fallback search for 'Total'
+    for tag in soup.find_all(lambda t: t.name in ['div', 'span', 'p'] and 'total' in t.get_text().lower()):
+        txt = tag.get_text(strip=True)
+        if re.search(r'Total', txt, re.I) and not re.search(r'subtotal', txt, re.I):
+            m = re.findall(r'\$\s*(\d+\.\d{2})', txt)
+            if m:
+                return Decimal(m[-1])
     return None
 
 
-def sync_receipts_folder():
+def extract_items_from_soup(soup):
+    """
+    Extracts all line items with high precision:
+    - Resolves accurate product titles
+    - Handles input/numeric/weighted quantities
+    - Extracts item total prices
+    - Extracts CDN image URLs
+    - Omits zero-dollar promotional stamps
+    - Adds bottle deposit/environmental handling fee line item if order total > sum(items) + tax
+    """
+    parsed_items = []
+    for li in soup.select('li.cart-entry-list__item'):
+        # 1. Product Name
+        name = None
+        title_el = li.select_one(
+            '.cart-entry__content--product-name, '
+            '.item-details__item-name, '
+            '[data-track="product-title"], '
+            '.product-name, '
+            '.cart-entry__content--product-details a, '
+            '.cart-entry__content--product-details span'
+        )
+        if title_el and title_el.get_text(strip=True):
+            name = title_el.get_text(strip=True)
+
+        if not name:
+            track_el = li.select_one('[data-track-products-array]')
+            if track_el:
+                try:
+                    arr = json.loads(track_el['data-track-products-array'])
+                    if arr and isinstance(arr, list) and arr[0].get('productName'):
+                        name = arr[0]['productName'].strip()
+                except Exception:
+                    pass
+
+        if not name:
+            img_el = li.select_one('img[alt]')
+            if img_el and img_el['alt'].strip():
+                name = img_el['alt'].strip()
+
+        name = name or 'Unknown Item'
+
+        # 2. Quantity
+        qty = None
+        qty_input = li.select_one(
+            'input.cart-entry__content__quantity, '
+            'input[name*="quantity"], '
+            'input[data-track*="quantity"]'
+        )
+        if qty_input and qty_input.get('value'):
+            qty = qty_input['value'].strip()
+
+        if not qty:
+            qty_el = li.select_one(
+                '.item-details__quantity, '
+                '[data-track="product-qty"], '
+                '.cart-entry__content--quantity'
+            )
+            if qty_el and qty_el.get_text(strip=True):
+                qty = qty_el.get_text(strip=True)
+
+        if not qty:
+            track_el = li.select_one('[data-track-products-array]')
+            if track_el:
+                try:
+                    arr = json.loads(track_el['data-track-products-array'])
+                    if arr and isinstance(arr, list) and arr[0].get('productQuantity'):
+                        qty = str(arr[0]['productQuantity'])
+                except Exception:
+                    pass
+
+        qty = qty or '1'
+
+        # 3. Price
+        price_el = li.select_one(
+            '.price--total .price__value, '
+            '.cart-entry__content__price--total .price__value, '
+            '.selling-price-list__item__price--now .price__value, '
+            '.cart-entry__content--product-price .price__value, '
+            '.price__value'
+        )
+        price = Decimal('0.00')
+        if price_el:
+            clean_str = re.sub(r'[^\d.]', '', price_el.get_text(strip=True))
+            if clean_str:
+                try:
+                    price = Decimal(clean_str)
+                except Exception:
+                    pass
+
+        # 4. Image
+        img_el = li.select_one(
+            'img.responsive-image, '
+            'img.responsive-image__image, '
+            '.cart-entry__content--image img, '
+            'img'
+        )
+        image_url = None
+        if img_el:
+            image_url = img_el.get('src') or img_el.get('data-src')
+            if image_url and image_url.startswith('//'):
+                image_url = 'https:' + image_url
+
+        # Exclude bash promotional stamps / non-grocery items
+        if price == Decimal('0.00') and any(k in name.lower() for k in ['stamp', 'earn physical stamp', 'promo']):
+            continue
+
+        parsed_items.append({
+            'name': name,
+            'quantity_str': qty,
+            'total_price': price,
+            'image_url': image_url
+        })
+
+    # Check for bottle deposit / environmental handling fees / cart fee difference
+    tax_val = parse_tax_from_soup(soup)
+    order_total = parse_order_total_from_soup(soup)
+    items_sum = sum((item['total_price'] for item in parsed_items), Decimal('0.00'))
+
+    if order_total and order_total > (items_sum + tax_val):
+        fee_diff = (order_total - (items_sum + tax_val)).quantize(Decimal('0.01'))
+        if fee_diff > Decimal('0.00'):
+            parsed_items.append({
+                'name': 'Bottle Deposit & Environmental Fees',
+                'quantity_str': '1',
+                'total_price': fee_diff,
+                'image_url': None
+            })
+
+    return parsed_items
+
+
+def sync_receipts_folder(force_refresh=False):
     ensure_roommates()
     os.makedirs(INBOX_DIR, exist_ok=True)
 
@@ -155,9 +299,13 @@ def sync_receipts_folder():
         order_date_str = time_el.get_text(strip=True) if time_el else ''
 
         receipt = Receipt.objects.filter(filename=fname).first()
-        if receipt and receipt.items.count() == 0 and len(soup.select('li.cart-entry-list__item')) > 0:
-            receipt.delete()
-            receipt = None
+
+        needs_reparse = force_refresh
+        if receipt:
+            if receipt.items.count() == 0 and len(soup.select('li.cart-entry-list__item')) > 0:
+                needs_reparse = True
+            elif receipt.items.filter(name='Unknown Item').exists():
+                needs_reparse = True
 
         if not receipt:
             receipt = Receipt.objects.create(
@@ -166,34 +314,25 @@ def sync_receipts_folder():
                 order_date_str=order_date_str,
                 file_modified_at=mtime
             )
+            needs_reparse = True
 
-            for li in soup.select('li.cart-entry-list__item'):
-                title_el = li.select_one('.item-details__item-name, [data-track="product-title"], .product-name')
-                name = title_el.get_text(strip=True) if title_el else "Unknown Item"
-
-                qty_el = li.select_one('.item-details__quantity, [data-track="product-qty"]')
-                qty = qty_el.get_text(strip=True) if qty_el else "1"
-
-                price_el = li.select_one('.selling-price-list__item__price--now .price__value, .price__value')
-                price = Decimal('0.00')
-                if price_el:
-                    clean_str = re.sub(r'[^\d.]', '', price_el.get_text(strip=True))
-                    if clean_str:
-                        try:
-                            price = Decimal(clean_str)
-                        except Exception:
-                            pass
-
-                img_el = li.select_one('img.responsive-image__image')
-                image_url = img_el['src'] if img_el and img_el.has_attr('src') else None
-
+        if needs_reparse:
+            receipt.items.all().delete()
+            parsed_items = extract_items_from_soup(soup)
+            for it in parsed_items:
                 ReceiptItem.objects.create(
                     receipt=receipt,
-                    name=name,
-                    quantity_str=qty,
-                    total_price=price,
-                    image_url=image_url
+                    name=it['name'],
+                    quantity_str=it['quantity_str'],
+                    total_price=it['total_price'],
+                    image_url=it['image_url']
                 )
+            if tax_val > Decimal('0.00'):
+                receipt.tax_amount = tax_val
+            if order_date_str:
+                receipt.order_date_str = order_date_str
+            receipt.file_modified_at = mtime
+            receipt.save()
         else:
             if receipt.tax_amount == Decimal('0.00') and tax_val > Decimal('0.00'):
                 receipt.tax_amount = tax_val

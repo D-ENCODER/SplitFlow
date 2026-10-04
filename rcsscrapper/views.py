@@ -572,7 +572,10 @@ def settle_up(request):
 @login_required(login_url='login')
 def delete_expense(request, expense_id):
     """Delete a shared expense or settlement payment (permission guarded)."""
-    expense = get_object_or_404(Expense, id=expense_id)
+    expense = Expense.objects.filter(id=expense_id).first()
+    if not expense:
+        messages.info(request, "Expense was already deleted or not found.")
+        return redirect('splitwise_dashboard')
     active_roommate = get_active_roommate(request)
     is_admin = is_admin_user(request.user)
 
@@ -662,11 +665,16 @@ def delete_receipts_and_files(queryset):
 
 @admin_required
 def delete_receipt(request, receipt_id):
-    receipt = get_object_or_404(Receipt, id=receipt_id)
-    was_archived = receipt.is_archived
-    delete_receipts_and_files(Receipt.objects.filter(id=receipt.id))
-    if was_archived:
-        return redirect(f"{reverse('receipt_list')}?archived=1")
+    receipt = Receipt.objects.filter(id=receipt_id).first()
+    if receipt:
+        was_archived = receipt.is_archived
+        fname = receipt.filename
+        delete_receipts_and_files(Receipt.objects.filter(id=receipt.id))
+        messages.success(request, f"Receipt '{fname}' deleted successfully.")
+        if was_archived:
+            return redirect(f"{reverse('receipt_list')}?archived=1")
+    else:
+        messages.info(request, "Receipt was already deleted or not found.")
     return redirect('receipt_list')
 
 
@@ -722,9 +730,14 @@ def receipt_list(request):
 
 @admin_required
 def toggle_archive_receipt(request, receipt_id):
-    receipt = get_object_or_404(Receipt, id=receipt_id)
-    receipt.is_archived = not receipt.is_archived
-    receipt.save()
+    receipt = Receipt.objects.filter(id=receipt_id).first()
+    if receipt:
+        receipt.is_archived = not receipt.is_archived
+        receipt.save()
+        status_str = "Archived" if receipt.is_archived else "Restored"
+        messages.success(request, f"Receipt '{receipt.filename}' is now {status_str}.")
+    else:
+        messages.info(request, "Receipt not found or already removed.")
     return redirect('receipt_list')
 
 
@@ -1311,7 +1324,10 @@ def group_list(request):
 @login_required(login_url='login')
 def select_group(request, group_id):
     """Switch the currently active working group."""
-    group = get_object_or_404(HouseholdGroup, id=group_id)
+    group = HouseholdGroup.objects.filter(id=group_id).first()
+    if not group:
+        messages.warning(request, "Selected group was not found.")
+        return redirect('splitwise_dashboard')
     request.session['active_group_id'] = group.id
     messages.success(request, f"Switched active group to '{group.name}'")
     next_url = request.GET.get('next') or reverse('splitwise_dashboard')

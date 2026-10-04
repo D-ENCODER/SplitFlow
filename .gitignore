@@ -17,3 +17,5 @@ rcsscrapper/receipts_inbox/*.html
 .idea/
 .vscode/
 .DS_Store
+staticfiles/
+

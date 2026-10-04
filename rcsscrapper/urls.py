@@ -19,6 +19,7 @@ urlpatterns = [\
     path('groups/', views.group_list, name='group_list'),
     path('groups/create/', views.create_group, name='create_group'),
     path('groups/<int:group_id>/select/', views.select_group, name='select_group'),
+    path('groups/<int:group_id>/manage/', views.manage_group, name='manage_group'),
     path('groups/import-splitwise/', views.import_splitwise_view, name='import_splitwise'),
 
     # Authentication Routes

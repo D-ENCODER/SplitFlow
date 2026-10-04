@@ -52,6 +52,23 @@ class HouseholdGroup(models.Model):
             return '✈️'
         return '👥'
 
+    @property
+    def admin_name(self):
+        if self.created_by:
+            return self.created_by.name
+        return 'Administrator'
+
+    def is_admin(self, user):
+        """Check if the given User or Roommate is an authorized admin of this group."""
+        if not user:
+            return False
+        if hasattr(user, 'is_authenticated') and not user.is_authenticated:
+            return False
+        if getattr(user, 'is_superuser', False) or getattr(user, 'is_staff', False) or getattr(user, 'username', '') == 'admin':
+            return True
+        user_rm = getattr(user, 'roommate', user if isinstance(user, Roommate) else None)
+        return bool(user_rm and self.created_by_id == user_rm.id)
+
 
 class Receipt(models.Model):
     group = models.ForeignKey(HouseholdGroup, on_delete=models.SET_NULL, null=True, blank=True, related_name='receipts')

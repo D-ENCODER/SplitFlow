@@ -12,96 +12,45 @@ INBOX_DIR = os.path.join(settings.BASE_DIR, 'rcsscrapper', 'receipts_inbox')
 
 
 def ensure_roommates():
+    """
+    Ensures an initial system administrator superuser exists if no superusers are present.
+    In open source installations, user and roommate creation is driven by registration
+    or group administration rather than hardcoded profiles.
+    """
     from django.contrib.auth.models import User
 
     # 1. Ensure system administrator account exists
     admin_user = User.objects.filter(username='admin').first()
-    if not admin_user:
+    if not admin_user and not User.objects.filter(is_superuser=True).exists():
         admin_user = User.objects.create_superuser(
             username='admin',
             email='admin@splitflow.local',
             password='Hado#33Sokatsui'
         )
-    else:
-        if not admin_user.is_superuser or not admin_user.is_staff:
-            admin_user.is_superuser = True
-            admin_user.is_staff = True
-            admin_user.save()
-
-    # Admin profile linked to admin user
-    admin_rm = getattr(admin_user, 'roommate', None)
-    if not admin_rm:
-        admin_rm = Roommate.objects.filter(name='Admin', user__isnull=True).first()
-        if not admin_rm:
-            admin_rm = Roommate.objects.create(
-                name='Admin',
-                user=admin_user,
-                email=admin_user.email or 'admin@splitflow.local',
-                is_me=False,
-                is_active=False
-            )
-        else:
-            admin_rm.user = admin_user
-            admin_rm.save()
-
-    # 2. Ensure primary household roommates exist
-    profiles = [
-        {'name': 'Het', 'username': 'het', 'is_me': True},
-        {'name': 'Ruchit', 'username': 'ruchit', 'is_me': False},
-        {'name': 'Tirth', 'username': 'tirth', 'is_me': False},
-        {'name': 'Maurya', 'username': 'maurya', 'is_me': False},
-    ]
-
-    for p in profiles:
-        user = User.objects.filter(username=p['username']).first()
-        if not user:
-            user = User.objects.create_user(
-                username=p['username'],
-                email=f"{p['username']}@splitflow.local",
-                password='admin'
-            )
-
-        # Look up by user's existing roommate link first (prevents duplicate key errors if renamed)
-        rm = getattr(user, 'roommate', None)
-        if not rm:
-            # Check if there is an unlinked roommate with this name
-            rm = Roommate.objects.filter(name=p['name'], user__isnull=True).first()
-            if not rm:
-                rm = Roommate.objects.create(
-                    name=p['name'],
-                    user=user,
-                    email=user.email,
-                    is_me=p['is_me'],
-                    is_active=True
-                )
-            else:
-                rm.user = user
-                rm.is_me = p['is_me']
-                rm.email = user.email
-                rm.is_active = True
-                rm.save()
-
-    # 3. Ensure primary household group exists and is populated
-    ensure_groups()
+        Roommate.objects.create(
+            name='Admin',
+            user=admin_user,
+            email='admin@splitflow.local',
+            is_me=False,
+            is_active=False
+        )
+    elif admin_user and not admin_user.is_superuser:
+        admin_user.is_superuser = True
+        admin_user.is_staff = True
+        admin_user.save()
 
 
 def ensure_groups():
-    from rcsscrapper.models import HouseholdGroup, Roommate, Expense, Receipt
-    group, _ = HouseholdGroup.objects.get_or_create(
-        name='41-27 Centennial',
-        defaults={'group_type': 'home', 'description': 'Primary household group for 41-27 Centennial'}
-    )
-    for rm in Roommate.objects.filter(is_active=True):
-        group.members.add(rm)
-
-    het = Roommate.objects.filter(is_me=True).first()
-    if het and not group.created_by:
-        group.created_by = het
-        group.save()
-
-    Expense.objects.filter(group__isnull=True).update(group=group)
-    Receipt.objects.filter(group__isnull=True).update(group=group)
-    return group
+    """
+    Ensures any legacy unassigned expenses/receipts are associated with a group.
+    Does not modify or mutate existing group memberships.
+    """
+    from rcsscrapper.models import HouseholdGroup, Expense, Receipt
+    default_group = HouseholdGroup.objects.filter(name='41-27 Centennial').first() or HouseholdGroup.objects.first()
+    if default_group:
+        Expense.objects.filter(group__isnull=True).update(group=default_group)
+        Receipt.objects.filter(group__isnull=True).update(group=default_group)
+    return default_group
 
 
 def parse_tax_from_soup(soup):
@@ -123,13 +72,13 @@ def parse_tax_from_soup(soup):
 
 
 def parse_order_total_from_soup(soup):
-    for selector in [
-        '.order-summary-total-item--trimmed__estimated-total .order-summary-total-item__values',
-        '.inprogress-payment-summary__total .order-summary-total-item__values',
-        '.inprogress-payment-summary__total',
-        '.order-dashboard-summary__total',
-        '.order-summary-total-item--trimmed__estimated-total',
-        '.preparing-order-summary .order-summary-sub-total__values',
+    for selector in [\
+        '.order-summary-total-item--trimmed__estimated-total .order-summary-total-item__values',\
+        '.inprogress-payment-summary__total .order-summary-total-item__values',\
+        '.inprogress-payment-summary__total',\
+        '.order-dashboard-summary__total',\
+        '.order-summary-total-item--trimmed__estimated-total',\
+        '.preparing-order-summary .order-summary-sub-total__values',\
     ]:
         el = soup.select_one(selector)
         if el:
@@ -140,7 +89,7 @@ def parse_order_total_from_soup(soup):
     # Text-based fallback search for 'Total'
     for tag in soup.find_all(lambda t: t.name in ['div', 'span', 'p'] and 'total' in t.get_text().lower()):
         txt = tag.get_text(strip=True)
-        if re.search(r'Total', txt, re.I) and not re.search(r'subtotal', txt, re.I):
+        if re.search(r'\bTotal\b', txt, re.I) and not re.search(r'subtotal', txt, re.I):
             m = re.findall(r'\$\s*(\d+\.\d{2})', txt)
             if m:
                 return Decimal(m[-1])
@@ -280,7 +229,6 @@ def extract_items_from_soup(soup):
 
 
 def sync_receipts_folder(force_refresh=False):
-    ensure_roommates()
     os.makedirs(INBOX_DIR, exist_ok=True)
 
     for fname in os.listdir(INBOX_DIR):

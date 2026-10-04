@@ -19,7 +19,7 @@
       </p>
     </div>
 
-    <div class="flex items-center gap-2.5">
+    <div class="flex flex-wrap items-center gap-2.5">
       <a href="{% url 'import_splitwise' %}"
          class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm transition">
         <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -40,7 +40,8 @@
 
   <!-- Groups Grid -->
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-    {% for g in groups %}
+    {% for item in annotated_groups %}
+    {% with g=item.group %}
     <div class="bg-white dark:bg-slate-900 rounded-3xl border {% if g.id == active_group.id %}border-indigo-500 dark:border-indigo-500 ring-2 ring-indigo-500/20 shadow-md{% else %}border-slate-200 dark:border-slate-800 shadow-sm hover:border-slate-300 dark:hover:border-slate-700{% endif %} p-6 flex flex-col justify-between transition">
       <div>
         <div class="flex items-start justify-between gap-3 mb-3">
@@ -52,12 +53,18 @@
               <h2 class="text-base font-bold text-slate-900 dark:text-white leading-snug">
                 {{ g.name }}
               </h2>
-              <span class="text-xs text-slate-400 capitalize">{{ g.get_group_type_display }}</span>
+              <div class="flex items-center gap-2 mt-0.5">
+                <span class="text-xs text-slate-400 capitalize">{{ g.get_group_type_display }}</span>
+                <span class="text-slate-300 dark:text-slate-700">&bull;</span>
+                <span class="text-[11px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                  👑 {{ item.admin_name }}{% if item.is_owner %} (You){% endif %}
+                </span>
+              </div>
             </div>
           </div>
 
           {% if g.id == active_group.id %}
-            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-800">
+            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-800 shrink-0">
               <span class="w-1.5 h-1.5 rounded-full bg-indigo-600"></span> Active
             </span>
           {% endif %}
@@ -73,7 +80,7 @@
         <div class="space-y-3 pt-3 border-t border-slate-100 dark:border-slate-800/80">
           <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
             <span>Members ({{ g.members.count }})</span>
-            <span class="font-mono font-semibold text-slate-700 dark:text-slate-300">{{ g.expenses.count }} expenses</span>
+            <span class="font-mono font-semibold text-slate-700 dark:text-slate-300">{{ g.expenses.count }} expense{{ g.expenses.count|pluralize }}</span>
           </div>
 
           <div class="flex flex-wrap items-center gap-1.5">
@@ -81,6 +88,7 @@
             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60">
               <span class="w-1.5 h-1.5 rounded-full {% if m.is_active %}bg-emerald-500{% else %}bg-slate-400{% endif %}"></span>
               {{ m.name }}
+              {% if g.created_by_id == m.id %}<span class="text-[10px] text-amber-500 font-bold" title="Group Creator / Admin">👑</span>{% endif %}
             </span>
             {% empty %}
             <span class="text-xs text-slate-400 italic">No members assigned yet</span>
@@ -89,20 +97,46 @@
         </div>
       </div>
 
-      <!-- Action Button -->
-      <div class="pt-5 mt-5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
+      <!-- Action Buttons -->
+      <div class="pt-5 mt-5 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2">
         {% if g.id == active_group.id %}
           <a href="{% url 'splitwise_dashboard' %}"
-             class="w-full text-center px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-sm">
-            View Active Ledger &rarr;
+             class="flex-1 text-center px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-sm">
+            View Ledger &rarr;
           </a>
         {% else %}
           <a href="{% url 'select_group' g.id %}"
-             class="w-full text-center px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-semibold transition">
-            Switch to This Group
+             class="flex-1 text-center px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-semibold transition">
+            Switch to Group
           </a>
         {% endif %}
+
+        {% if item.can_manage %}
+          <button type="button"
+                  onclick="openManageModal('{{ g.id }}', '{{ g.name|escapejs }}', '{{ g.description|escapejs }}', '{{ g.group_type }}', [
+                    {% for m in g.members.all %}
+                      { id: '{{ m.id }}', name: '{{ m.name|escapejs }}', is_creator: {% if g.created_by_id == m.id %}true{% else %}false{% endif %} }{% if not forloop.last %},{% endif %}
+                    {% endfor %}
+                  ])"
+                  class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition"
+                  title="Manage Group & Members (Admin)">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
+        {% endif %}
       </div>
+    </div>
+    {% endwith %}
+    {% empty %}
+    <div class="col-span-full py-16 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 space-y-3">
+      <div class="w-14 h-14 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-950 flex items-center justify-center text-3xl">🏠</div>
+      <h3 class="text-base font-bold text-slate-800 dark:text-slate-100">No Household Groups Yet</h3>
+      <p class="text-xs text-slate-500 max-w-sm mx-auto">Create your first household or trip group to start logging and splitting shared expenses!</p>
+      <button type="button" onclick="openCreateGroupModal()" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-500 transition">
+        Create Your First Group
+      </button>
     </div>
     {% endfor %}
   </div>
@@ -149,7 +183,7 @@
 
       <!-- Add Roommates -->
       <div>
-        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">Select Members</label>
+        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">Select Initial Members</label>
         <div class="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
           {% for rm in available_roommates %}
           <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 cursor-pointer">
@@ -159,7 +193,7 @@
           </label>
           {% endfor %}
         </div>
-        <p class="text-[11px] text-slate-400 mt-1.5">You can also import new members automatically by uploading a Splitwise CSV.</p>
+        <p class="text-[11px] text-slate-400 mt-1.5">You can also import members automatically from Splitwise or add them anytime.</p>
       </div>
 
       <div class="pt-2 flex items-center justify-end gap-2.5 border-t border-slate-100 dark:border-slate-800">
@@ -176,12 +210,174 @@
   </div>
 </div>
 
+<!-- ======================================================== -->
+<!-- MODAL: MANAGE GROUP & MEMBERS (ADMIN) -->
+<!-- ======================================================== -->
+<div id="manage-group-modal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+  <div class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 sm:p-7 space-y-6 animate-card-enter max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+      <div>
+        <div class="flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400">
+          <span>👑 Group Administration</span>
+        </div>
+        <h3 id="manage-modal-title" class="text-lg font-bold text-slate-900 dark:text-white">Manage Group</h3>
+      </div>
+      <button type="button" onclick="closeManageModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition">
+        &times;
+      </button>
+    </div>
+
+    <!-- Section 1: Edit Details -->
+    <form id="manage-edit-form" method="post" action="" class="space-y-3 pb-4 border-b border-slate-100 dark:border-slate-800">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="edit_details">
+      <div class="flex items-center justify-between">
+        <label class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Group Details</label>
+        <button type="submit" class="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+          Save Changes
+        </button>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-[11px] text-slate-400">Name</label>
+          <input type="text" id="manage-name" name="name" required class="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white">
+        </div>
+        <div>
+          <label class="text-[11px] text-slate-400">Type</label>
+          <select id="manage-type" name="group_type" class="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white">
+            <option value="home">🏠 House</option>
+            <option value="trip">✈️ Trip</option>
+            <option value="other">👥 Other</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="text-[11px] text-slate-400">Description</label>
+        <input type="text" id="manage-desc" name="description" class="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white">
+      </div>
+    </form>
+
+    <!-- Section 2: Members List & Removal -->
+    <div class="space-y-3 pb-4 border-b border-slate-100 dark:border-slate-800">
+      <label class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 block">Current Members</label>
+      <div id="manage-members-list" class="space-y-2 max-h-40 overflow-y-auto">
+        <!-- Injected via JavaScript -->
+      </div>
+    </div>
+
+    <!-- Section 3: Add Member -->
+    <div class="space-y-3 pb-4 border-b border-slate-100 dark:border-slate-800">
+      <label class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 block">Add Member</label>
+      
+      <!-- Option A: Existing Roommate -->
+      <form id="manage-add-existing-form" method="post" action="" class="space-y-2">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_member">
+        <label class="text-[11px] text-slate-400">Add from existing roommates / users:</label>
+        <div class="flex items-center gap-2">
+          <select name="roommate_id" class="flex-1 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white">
+            {% for rm in available_roommates %}
+            <option value="{{ rm.id }}">{{ rm.name }} ({{ rm.email|default:"No email" }})</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-500 transition">
+            Add
+          </button>
+        </div>
+      </form>
+
+      <!-- Option B: Direct New Name & Email -->
+      <form id="manage-add-new-form" method="post" action="" class="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_member">
+        <label class="text-[11px] text-slate-400">Or add brand new person:</label>
+        <div class="grid grid-cols-2 gap-2">
+          <input type="text" name="new_member_name" placeholder="Full Name" required class="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white">
+          <input type="email" name="new_member_email" placeholder="Email (optional)" class="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white">
+        </div>
+        <div class="text-right">
+          <button type="submit" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-500 transition">
+            Create &amp; Add Member
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Section 4: Danger Zone (Delete Group) -->
+    <div class="flex items-center justify-between pt-1">
+      <form id="manage-delete-form" method="post" action="" onsubmit="return confirm('Are you sure you want to permanently delete this group?');">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="delete_group">
+        <button type="submit" class="text-xs font-semibold text-rose-600 dark:text-rose-400 hover:underline">
+          Delete Group
+        </button>
+      </form>
+
+      <button type="button" onclick="closeManageModal()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition">
+        Done
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
   function openCreateGroupModal() {
     document.getElementById('create-group-modal').classList.remove('hidden');
   }
   function closeCreateGroupModal() {
     document.getElementById('create-group-modal').classList.add('hidden');
+  }
+
+  function openManageModal(groupId, name, desc, groupType, members) {
+    const manageUrl = `/groups/${groupId}/manage/`;
+    document.getElementById('manage-edit-form').action = manageUrl;
+    document.getElementById('manage-add-existing-form').action = manageUrl;
+    document.getElementById('manage-add-new-form').action = manageUrl;
+    document.getElementById('manage-delete-form').action = manageUrl;
+
+    document.getElementById('manage-modal-title').textContent = `Manage: ${name}`;
+    document.getElementById('manage-name').value = name;
+    document.getElementById('manage-desc').value = desc || '';
+    document.getElementById('manage-type').value = groupType || 'home';
+
+    const membersContainer = document.getElementById('manage-members-list');
+    membersContainer.innerHTML = '';
+
+    members.forEach(m => {
+      const row = document.createElement('div');
+      row.className = 'flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs';
+      
+      let badge = m.is_creator ? '<span class="text-[10px] text-amber-500 font-bold ml-1">👑 Admin</span>' : '';
+      let removeBtn = '';
+      if (!m.is_creator) {
+        removeBtn = `
+          <form method="post" action="${manageUrl}" onsubmit="return confirm('Remove ${m.name} from group?');">
+            <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+            <input type="hidden" name="action" value="remove_member">
+            <input type="hidden" name="roommate_id" value="${m.id}">
+            <button type="submit" class="text-rose-500 hover:text-rose-600 font-semibold px-2 py-0.5 rounded hover:bg-rose-50 dark:hover:bg-rose-950/40 transition">
+              Remove
+            </button>
+          </form>
+        `;
+      } else {
+        removeBtn = '<span class="text-[11px] text-slate-400">Creator</span>';
+      }
+
+      row.innerHTML = `
+        <span class="font-semibold text-slate-800 dark:text-slate-200 flex items-center">
+          ${m.name} ${badge}
+        </span>
+        ${removeBtn}
+      `;
+      membersContainer.appendChild(row);
+    });
+
+    document.getElementById('manage-group-modal').classList.remove('hidden');
+  }
+
+  function closeManageModal() {
+    document.getElementById('manage-group-modal').classList.add('hidden');
   }
 </script>
 {% endblock %}

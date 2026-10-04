@@ -136,6 +136,17 @@ def register_view(request):
             rm.is_active = True
             rm.save()
 
+            # Ensure new user has their own household group where they are Group Admin
+            if not rm.groups.exists():
+                user_group = HouseholdGroup.objects.create(
+                    name=f"{full_name}'s Household",
+                    group_type='home',
+                    description=f"Primary household group created by {full_name}",
+                    created_by=rm
+                )
+                user_group.members.add(rm)
+                request.session['active_group_id'] = user_group.id
+
             login(request, user)
             messages.success(request, f"Welcome to SplitFlow, {full_name}! Your profile is ready.")
             return redirect('splitwise_dashboard')
@@ -447,12 +458,8 @@ def add_expense(request):
             messages.error(request, "Expense amount must be greater than $0.")
             return redirect('splitwise_dashboard')
 
+        # Date is strictly enforced as today's date (past dates can be referenced in notes)
         exp_date = timezone.now().date()
-        if date_str:
-            try:
-                exp_date = timezone.datetime.strptime(date_str, '%Y-%m-%d').date()
-            except ValueError:
-                pass
 
         split_type = request.POST.get('split_type', 'equal')
         selected_rms = request.POST.getlist('split_roommates')
@@ -544,12 +551,8 @@ def settle_up(request):
             messages.error(request, "Permission denied: You must be either the payer or the recipient in this settlement.")
             return redirect('splitwise_dashboard')
 
+        # Payment date is strictly today
         pay_date = timezone.now().date()
-        if date_str:
-            try:
-                pay_date = timezone.datetime.strptime(date_str, '%Y-%m-%d').date()
-            except ValueError:
-                pass
 
         Expense.objects.create(
             group=target_group,
@@ -1309,16 +1312,109 @@ def service_worker_view(request):
 
 @login_required(login_url='login')
 def group_list(request):
-    """View and manage all household, trip, and shared expense groups."""
+    """View and manage all household, trip, and shared expense groups with role-based administration."""
     active_group = get_active_group(request)
     all_groups = list(HouseholdGroup.objects.all().prefetch_related('members', 'expenses'))
     active_rms = list(Roommate.objects.filter(is_active=True))
 
+    user_rm = getattr(request.user, 'roommate', None)
+    annotated_groups = []
+    for g in all_groups:
+        annotated_groups.append({
+            'group': g,
+            'can_manage': g.is_admin(request.user),
+            'is_owner': bool(user_rm and g.created_by_id == user_rm.id),
+            'admin_name': g.admin_name,
+        })
+
     return render(request, 'splitter/group_list.html', {
-        'groups': all_groups,
+        'annotated_groups': annotated_groups,
         'active_group': active_group,
         'available_roommates': active_rms,
     })
+
+
+@login_required(login_url='login')
+def manage_group(request, group_id):
+    """
+    Group Admin action handler:
+    - Edit group details (name, description, type)
+    - Add members (existing registered user/roommate or create new roommate)
+    - Remove members (guarded: cannot remove creator)
+    - Delete group (guarded: cannot delete Centennial unless system admin)
+    """
+    group = HouseholdGroup.objects.filter(id=group_id).first()
+    if not group:
+        messages.error(request, "Group not found.")
+        return redirect('group_list')
+
+    if not group.is_admin(request.user):
+        messages.error(request, "Permission denied: Only the Group Admin can manage this group.")
+        return redirect('group_list')
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'edit_details':
+            name = request.POST.get('name', '').strip()
+            desc = request.POST.get('description', '').strip()
+            group_type = request.POST.get('group_type', group.group_type)
+
+            if not name:
+                messages.error(request, "Group name cannot be blank.")
+            else:
+                group.name = name
+                group.description = desc
+                group.group_type = group_type
+                group.save()
+                messages.success(request, f"Updated group '{group.name}' details successfully.")
+
+        elif action == 'add_member':
+            existing_rm_id = request.POST.get('roommate_id')
+            new_name = request.POST.get('new_member_name', '').strip()
+            new_email = request.POST.get('new_member_email', '').strip()
+
+            if existing_rm_id:
+                rm = Roommate.objects.filter(id=existing_rm_id).first()
+                if rm:
+                    group.members.add(rm)
+                    messages.success(request, f"Added {rm.name} to {group.name}.")
+            elif new_name:
+                rm, created = Roommate.objects.get_or_create(
+                    name=new_name,
+                    defaults={
+                        'email': new_email or f"{new_name.lower().replace(' ', '')}@splitflow.local",
+                        'is_me': False,
+                        'is_active': True
+                    }
+                )
+                group.members.add(rm)
+                messages.success(request, f"Added new roommate {rm.name} to {group.name}!")
+            else:
+                messages.warning(request, "Please choose an existing roommate or enter a new name.")
+
+        elif action == 'remove_member':
+            rm_id = request.POST.get('roommate_id')
+            rm = Roommate.objects.filter(id=rm_id).first()
+            if rm:
+                if group.created_by and rm.id == group.created_by.id:
+                    messages.error(request, f"Cannot remove {rm.name} because they are the group creator/admin.")
+                else:
+                    group.members.remove(rm)
+                    messages.info(request, f"Removed {rm.name} from {group.name}.")
+
+        elif action == 'delete_group':
+            if group.name == '41-27 Centennial' and not is_admin_user(request.user):
+                messages.error(request, "The primary household group '41-27 Centennial' cannot be deleted.")
+            else:
+                g_name = group.name
+                if request.session.get('active_group_id') == group.id:
+                    request.session.pop('active_group_id', None)
+                group.delete()
+                messages.success(request, f"Group '{g_name}' was successfully deleted.")
+                return redirect('group_list')
+
+    return redirect('group_list')
 
 
 @login_required(login_url='login')

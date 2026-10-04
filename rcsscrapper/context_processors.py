@@ -1,9 +1,8 @@
+from django.utils import timezone
 from rcsscrapper.models import Roommate, Receipt, HouseholdGroup
-from rcsscrapper.utils import ensure_roommates, ensure_groups
 
 
 def get_active_group(request):
-    ensure_groups()
     group_id = request.session.get('active_group_id')
     if group_id:
         group = HouseholdGroup.objects.filter(id=group_id).first()
@@ -30,10 +29,10 @@ def splitflow_context(request):
     - nav_active_roommates: list of active roommates in current group
     - nav_current_roommate: currently authenticated roommate profile (or None)
     - nav_is_admin: True if user is administrator / superuser / staff
+    - nav_is_group_admin: True if user is creator of active group or staff/admin
     - nav_pending_receipts_count: number of unprocessed Superstore receipts (admin only)
+    - today: current date for template inputs
     """
-    ensure_roommates()
-    ensure_groups()
     active_group = get_active_group(request)
 
     all_groups = list(HouseholdGroup.objects.all())
@@ -57,11 +56,15 @@ def splitflow_context(request):
 
     pending_count = Receipt.objects.filter(is_archived=False, processed=False).count() if is_admin else 0
 
+    is_group_admin = bool(is_admin or (active_group and current_rm and active_group.created_by_id == current_rm.id))
+
     return {
         'nav_active_group': active_group,
         'nav_all_groups': all_groups,
         'nav_active_roommates': active_roommates,
         'nav_current_roommate': current_rm,
         'nav_is_admin': is_admin,
+        'nav_is_group_admin': is_group_admin,
+        'today': timezone.now().date(),
         'nav_pending_receipts_count': pending_count,
     }

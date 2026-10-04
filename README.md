@@ -21,7 +21,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/dashboard_preview.jpg" alt="SplitFlow Dashboard" width="850" style="border-radius: 8px; border: 1px solid #30363d;" />
+  <img src="docs/images/dashboard_preview.png" alt="SplitFlow Dashboard Demo Screenshot" width="850" style="border-radius: 8px; border: 1px solid #30363d;" />
 </p>
 
 </div>
@@ -188,6 +188,10 @@ For public demonstration, testing, and evaluation, SplitFlow includes pre-packag
 - **`data/demo/demo_splitwise_export.csv`**: Clean sample CSV export for testing Splitwise migrations.
 - **`data/demo/demo_superstore_receipt.html`**: Validated HTML grocery order (#RCS-84920412) for testing receipt parsing and bottle deposit reconciliation.
 - **`docs/index.html`**: Pure client-side simulation implementing the greedy Min-Cash-Flow algorithm, date locking, and DOM reconciliation.
+
+<p align="center" style="margin-top: 18px;">
+  <img src="docs/images/receipt_parser_preview.png" alt="Superstore Receipt Itemizer Demo Screenshot" width="850" style="border-radius: 8px; border: 1px solid #30363d;" />
+</p>
 
 ---
 

@@ -15,10 +15,13 @@
   <meta name="application-name" content="SplitFlow">
   <meta name="description" content="Household expense tracking, Splitwise debt settlement, and automated Superstore receipt splitting">
 
-  <!-- Icons for iOS, Android, and Desktop -->
-  <link rel="apple-touch-icon" href="static/icons/splitflow_logo.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="static/icons/splitflow_logo.png">
-  <link rel="icon" type="image/svg+xml" href="static/icons/icon.svg">
+  <!-- Favicons and Browser Tab Icons -->
+  <link rel="icon" type="image/x-icon" href="static/favicon.ico">
+  <link rel="shortcut icon" type="image/x-icon" href="static/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="static/icons/favicon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="static/icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="static/icons/splitflow_logo.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="static/icons/apple-touch-icon.png">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -344,7 +347,7 @@
 
             <!-- Logout -->
             <div class="border-t border-slate-100 dark:border-slate-800 pt-1 mt-1">
-              <a href="#"
+              <a href="login.html"
                  class="flex items-center gap-2.5 px-4 py-2 text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -626,7 +629,7 @@
     </div>
 
     <form method="post" action="/groups/create/" class="space-y-4">
-      <input type="hidden" name="csrfmiddlewaretoken" value="QE2IgPJS3nHPgZJpQhbbLZjJy3Oa2rnsMm6YLZ04vZJusXkmavMmETQuAEVGw9a2">
+      <input type="hidden" name="csrfmiddlewaretoken" value="4Gco44R7gzImKxW3Tp6VoJDkocBPOWXVOKcf5CLKD49p3SYuYuU8BIhhtNO9ZmST">
       <div>
         <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Group Name</label>
         <input type="text" name="name" required placeholder="e.g. Maple Residence, Banff Road Trip, Apartment 302"
@@ -715,7 +718,7 @@
 
     <!-- Section 1: Edit Details -->
     <form id="manage-edit-form" method="post" action="" class="space-y-3 pb-4 border-b border-slate-100 dark:border-slate-800">
-      <input type="hidden" name="csrfmiddlewaretoken" value="QE2IgPJS3nHPgZJpQhbbLZjJy3Oa2rnsMm6YLZ04vZJusXkmavMmETQuAEVGw9a2">
+      <input type="hidden" name="csrfmiddlewaretoken" value="4Gco44R7gzImKxW3Tp6VoJDkocBPOWXVOKcf5CLKD49p3SYuYuU8BIhhtNO9ZmST">
       <input type="hidden" name="action" value="edit_details">
       <div class="flex items-center justify-between">
         <label class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Group Details</label>
@@ -757,7 +760,7 @@
       
       <!-- Option A: Existing Roommate -->
       <form id="manage-add-existing-form" method="post" action="" class="space-y-2">
-        <input type="hidden" name="csrfmiddlewaretoken" value="QE2IgPJS3nHPgZJpQhbbLZjJy3Oa2rnsMm6YLZ04vZJusXkmavMmETQuAEVGw9a2">
+        <input type="hidden" name="csrfmiddlewaretoken" value="4Gco44R7gzImKxW3Tp6VoJDkocBPOWXVOKcf5CLKD49p3SYuYuU8BIhhtNO9ZmST">
         <input type="hidden" name="action" value="add_member">
         <label class="text-[11px] text-slate-400">Add from existing roommates / users:</label>
         <div class="flex items-center gap-2">
@@ -780,7 +783,7 @@
 
       <!-- Option B: Direct New Name & Email -->
       <form id="manage-add-new-form" method="post" action="" class="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-        <input type="hidden" name="csrfmiddlewaretoken" value="QE2IgPJS3nHPgZJpQhbbLZjJy3Oa2rnsMm6YLZ04vZJusXkmavMmETQuAEVGw9a2">
+        <input type="hidden" name="csrfmiddlewaretoken" value="4Gco44R7gzImKxW3Tp6VoJDkocBPOWXVOKcf5CLKD49p3SYuYuU8BIhhtNO9ZmST">
         <input type="hidden" name="action" value="add_member">
         <label class="text-[11px] text-slate-400">Or add brand new person:</label>
         <div class="grid grid-cols-2 gap-2">
@@ -798,7 +801,7 @@
     <!-- Section 4: Danger Zone (Delete Group) -->
     <div class="flex items-center justify-between pt-1">
       <form id="manage-delete-form" method="post" action="" onsubmit="return confirm('Are you sure you want to permanently delete this group?');">
-        <input type="hidden" name="csrfmiddlewaretoken" value="QE2IgPJS3nHPgZJpQhbbLZjJy3Oa2rnsMm6YLZ04vZJusXkmavMmETQuAEVGw9a2">
+        <input type="hidden" name="csrfmiddlewaretoken" value="4Gco44R7gzImKxW3Tp6VoJDkocBPOWXVOKcf5CLKD49p3SYuYuU8BIhhtNO9ZmST">
         <input type="hidden" name="action" value="delete_group">
         <button type="submit" class="text-xs font-semibold text-rose-600 dark:text-rose-400 hover:underline">
           Delete Group
@@ -844,7 +847,7 @@
       if (!m.is_creator) {
         removeBtn = `
           <form method="post" action="${manageUrl}" onsubmit="return confirm('Remove ${m.name} from group?');">
-            <input type="hidden" name="csrfmiddlewaretoken" value="QE2IgPJS3nHPgZJpQhbbLZjJy3Oa2rnsMm6YLZ04vZJusXkmavMmETQuAEVGw9a2">
+            <input type="hidden" name="csrfmiddlewaretoken" value="4Gco44R7gzImKxW3Tp6VoJDkocBPOWXVOKcf5CLKD49p3SYuYuU8BIhhtNO9ZmST">
             <input type="hidden" name="action" value="remove_member">
             <input type="hidden" name="roommate_id" value="${m.id}">
             <button type="submit" class="text-rose-500 hover:text-rose-600 font-semibold px-2 py-0.5 rounded hover:bg-rose-50 dark:hover:bg-rose-950/40 transition">
@@ -1096,6 +1099,10 @@
       else if (href === '/analytics/') link.setAttribute('href', 'analytics.html');
       else if (href === '/receipts/') link.setAttribute('href', 'receipts.html');
       else if (href === '/groups/import-splitwise/') link.setAttribute('href', 'import_splitwise.html');
+      else if (href === '/login/') link.setAttribute('href', 'login.html');
+      else if (href === '/register/') link.setAttribute('href', 'register.html');
+      else if (href === '/forgot-password/') link.setAttribute('href', 'forgot_password.html');
+      else if (href === '/logout/') link.setAttribute('href', 'login.html');
       else if (href.startsWith('/batch/assign/')) link.setAttribute('href', 'batch_process.html');
       else if (href.startsWith('/batch/summary/')) link.setAttribute('href', 'batch_summary.html');
     });

@@ -8,7 +8,7 @@
         <div class="flex items-center gap-2 mb-1.5 flex-wrap">
           <a href="{% url 'group_list' %}" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/70 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800 transition shadow-sm" title="Switch Household Group">
             <span class="text-sm">{{ active_group.type_icon|default:"🏠" }}</span>
-            <span>{{ active_group.name|default:"41-27 Centennial" }}</span>
+            <span>{{ active_group.name|default:"Household" }}</span>
             <span class="text-[10px] text-indigo-400">▾</span>
           </a>
           <span class="text-xs text-slate-400">

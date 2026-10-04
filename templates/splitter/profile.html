@@ -1,0 +1,413 @@
+{% extends "splitter/base.html" %}
+{% block content %}
+<div class="space-y-6 animate-card-enter">
+
+  <!-- ======================================================== -->
+  <!-- 1. USER PROFILE HERO BANNER -->
+  <!-- ======================================================== -->
+  <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 sm:p-8">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      
+      <!-- Left: User Identity -->
+      <div class="flex items-center gap-4 sm:gap-5">
+        <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl {% if is_admin %}bg-gradient-to-tr from-amber-600 via-orange-500 to-amber-400 shadow-amber-300 dark:shadow-none{% else %}bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-500 shadow-indigo-300 dark:shadow-none{% endif %} shadow-lg text-white font-extrabold text-2xl sm:text-3xl flex items-center justify-center shrink-0">
+          {% if user_rm %}{{ user_rm.name|slice:":1"|upper }}{% else %}{{ profile_user.username|slice:":1"|upper }}{% endif %}
+        </div>
+        
+        <div class="space-y-1.5 min-w-0">
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white truncate">
+              {% if user_rm %}{{ user_rm.name }}{% else %}{{ profile_user.first_name|default:profile_user.username|title }}{% endif %}
+            </h1>
+            
+            {% if is_admin %}
+              <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                👑 Administrator
+              </span>
+            {% else %}
+              <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                🏠 Roommate
+              </span>
+            {% endif %}
+
+            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active
+            </span>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+            <span>@{{ profile_user.username }}</span>
+            <span>&bull;</span>
+            <span>{{ profile_user.email|default:"No email set" }}</span>
+            <span>&bull;</span>
+            <span class="text-indigo-600 dark:text-indigo-400 font-medium">Joined {{ profile_user.date_joined|date:"M d, Y" }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Network Status & Quick Navigation -->
+      <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+        <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200">
+          <svg class="w-3.5 h-3.5 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+          </svg>
+          <span>Tailscale Funnel Connected</span>
+        </div>
+
+        {% if is_admin %}
+          <a href="{% url 'admin:index' %}" target="_blank"
+             class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold shadow-sm transition">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span>Django Admin &rarr;</span>
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 2. ROOMMATE FINANCIAL PROFILE (If active roommate) -->
+  <!-- ======================================================== -->
+  {% if personal_summary %}
+  <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 sm:p-7 space-y-5">
+    <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+      <div>
+        <h2 class="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <span>Personal Household Standing</span>
+          <span class="text-xs font-normal text-slate-400">Locked to your verified profile</span>
+        </h2>
+        <p class="text-xs text-slate-400 mt-0.5">Your personal debt settlement and ledger status across the apartment</p>
+      </div>
+      <a href="{% url 'splitwise_dashboard' %}" class="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+        Go to Household Ledger &rarr;
+      </a>
+    </div>
+
+    <!-- 3 High-Impact Stat Tiles -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <!-- Net Balance -->
+      <div class="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40">
+        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Your Net Balance</div>
+        <div class="text-2xl font-extrabold {% if personal_summary.total_net > 0 %}text-emerald-600 dark:text-emerald-400{% elif personal_summary.total_net < 0 %}text-amber-600 dark:text-amber-400{% else %}text-slate-600 dark:text-slate-300{% endif %}">
+          {% if personal_summary.total_net > 0 %}
+            +${{ personal_summary.total_net }}
+          {% elif personal_summary.total_net < 0 %}
+            -${{ personal_summary.total_net|stringformat:".2f"|slice:"1:" }}
+          {% else %}
+            $0.00
+          {% endif %}
+        </div>
+        <div class="text-xs text-slate-400 mt-1">
+          {% if personal_summary.total_net > 0 %}You are owed by roommates{% elif personal_summary.total_net < 0 %}You owe to roommates{% else %}Completely settled up{% endif %}
+        </div>
+      </div>
+
+      <!-- Total Paid by You -->
+      <div class="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40">
+        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Total Expenses Paid</div>
+        <div class="text-2xl font-extrabold text-indigo-600 dark:text-indigo-400 font-mono">
+          ${{ total_paid|floatformat:2 }}
+        </div>
+        <div class="text-xs text-slate-400 mt-1">Directly paid on bills &amp; groceries</div>
+      </div>
+
+      <!-- Total Share Consumed -->
+      <div class="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40">
+        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Your Consumed Share</div>
+        <div class="text-2xl font-extrabold text-slate-800 dark:text-slate-200 font-mono">
+          ${{ total_share|floatformat:2 }}
+        </div>
+        <div class="text-xs text-slate-400 mt-1">Your exact share of household costs</div>
+      </div>
+    </div>
+
+    <!-- Roommate-by-Roommate Balances -->
+    <div class="pt-2">
+      <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Roommate Breakdown</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {% for fb in personal_summary.friend_balances %}
+        <div class="p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-between gap-3">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <span class="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center shrink-0">
+              {{ fb.roommate.name|slice:":1" }}
+            </span>
+            <div class="min-w-0">
+              <div class="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{{ fb.roommate.name }}</div>
+              <div class="text-[11px]">
+                {% if fb.status == 'owes_you' %}
+                  <span class="text-emerald-600 dark:text-emerald-400 font-semibold">owes you ${{ fb.amount }}</span>
+                {% elif fb.status == 'you_owe' %}
+                  <span class="text-amber-600 dark:text-amber-400 font-semibold">you owe ${{ fb.amount }}</span>
+                {% else %}
+                  <span class="text-slate-400">settled up</span>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          {% if fb.status != 'settled' %}
+          <a href="{% url 'splitwise_dashboard' %}" class="px-2 py-1 rounded-lg text-xs font-semibold bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 transition shrink-0">
+            Settle
+          </a>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ======================================================== -->
+  <!-- 3. ROLE-BASED ADMINISTRATOR HUB (Staff / Admin Only) -->
+  <!-- ======================================================== -->
+  {% if is_admin %}
+  <div class="bg-white dark:bg-slate-900 rounded-3xl border border-amber-200/80 dark:border-amber-900/50 shadow-sm p-6 sm:p-7 space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
+      <div>
+        <h2 class="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <span class="w-6 h-6 rounded-lg bg-amber-500 text-white font-bold text-xs flex items-center justify-center">👑</span>
+          <span>Administrator Management Hub</span>
+        </h2>
+        <p class="text-xs text-slate-400 mt-0.5">Household user administration, status toggles, and system metrics</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/70 border border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs font-bold">
+          System Admin: {{ profile_user.username }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Admin System Metrics -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div class="p-3.5 rounded-2xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30">
+        <div class="text-[10px] font-bold uppercase text-amber-800 dark:text-amber-400">Total Expenses</div>
+        <div class="text-xl font-extrabold text-slate-900 dark:text-white mt-1">{{ system_stats.total_exp_count }}</div>
+      </div>
+      <div class="p-3.5 rounded-2xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30">
+        <div class="text-[10px] font-bold uppercase text-amber-800 dark:text-amber-400">Total CAD Spent</div>
+        <div class="text-xl font-extrabold text-slate-900 dark:text-white mt-1">${{ system_stats.total_exp_spent|floatformat:2 }}</div>
+      </div>
+      <div class="p-3.5 rounded-2xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30">
+        <div class="text-[10px] font-bold uppercase text-amber-800 dark:text-amber-400">Superstore Receipts</div>
+        <div class="text-xl font-extrabold text-slate-900 dark:text-white mt-1">{{ system_stats.total_receipts_count }}</div>
+      </div>
+      <div class="p-3.5 rounded-2xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30">
+        <div class="text-[10px] font-bold uppercase text-amber-800 dark:text-amber-400">User Accounts</div>
+        <div class="text-xl font-extrabold text-slate-900 dark:text-white mt-1">{{ system_stats.total_users_count }}</div>
+      </div>
+    </div>
+
+    <!-- Roommate Roster Table -->
+    <div class="space-y-3">
+      <div class="flex items-center justify-between">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Household Roommate Roster</h3>
+        <span class="text-xs text-slate-400">Manage user access &amp; credentials</span>
+      </div>
+
+      <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-50 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 uppercase font-semibold text-[10px] border-b border-slate-200 dark:border-slate-800">
+            <tr>
+              <th class="px-4 py-3">Roommate</th>
+              <th class="px-4 py-3">Username</th>
+              <th class="px-4 py-3">Role</th>
+              <th class="px-4 py-3">Status</th>
+              <th class="px-4 py-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 dark:divide-slate-800/60">
+            {% for r in all_roommates_admin %}
+            <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition">
+              <td class="px-4 py-3 font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                <span class="w-6 h-6 rounded-lg bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold text-[10px] flex items-center justify-center">
+                  {{ r.name|slice:":1" }}
+                </span>
+                <span>{{ r.name }}{% if r.is_me %} (Me){% endif %}</span>
+              </td>
+              <td class="px-4 py-3 text-slate-600 dark:text-slate-400 font-mono">
+                {% if r.user %}@{{ r.user.username }}{% else %}<span class="text-slate-400 italic">No User</span>{% endif %}
+              </td>
+              <td class="px-4 py-3">
+                {% if r.user and r.user.is_superuser %}
+                  <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300">Admin</span>
+                {% else %}
+                  <span class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">Roommate</span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-3">
+                {% if r.is_active %}
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active
+                  </span>
+                {% else %}
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500">
+                    Inactive
+                  </span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-3 text-right">
+                <div class="inline-flex items-center gap-1.5">
+                  <!-- Toggle Active Status Form -->
+                  <form method="post" action="{% url 'profile' %}" class="inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="toggle_roommate_status">
+                    <input type="hidden" name="roommate_id" value="{{ r.id }}">
+                    <button type="submit"
+                            onclick="return confirm('Change active status for {{ r.name }}?');"
+                            class="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-[11px] font-medium transition cursor-pointer">
+                      {% if r.is_active %}Deactivate{% else %}Activate{% endif %}
+                    </button>
+                  </form>
+
+                  <!-- Reset Password Form Button -->
+                  {% if r.user %}
+                  <button type="button"
+                          onclick="openResetPasswordModal('{{ r.user.id }}', '{{ r.user.username }}')"
+                          class="px-2 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-[11px] font-semibold transition cursor-pointer">
+                    Reset Pwd
+                  </button>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ======================================================== -->
+  <!-- 4. ACCOUNT SETTINGS & SECURITY -->
+  <!-- ======================================================== -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    
+    <!-- Card A: Personal Details Form -->
+    <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 space-y-4">
+      <div class="border-b border-slate-100 dark:border-slate-800 pb-3">
+        <h3 class="text-sm font-bold text-slate-900 dark:text-white">Profile Details</h3>
+        <p class="text-xs text-slate-400">Update your display name and email address</p>
+      </div>
+
+      <form method="post" action="{% url 'profile' %}" class="space-y-4">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_profile">
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Full Name</label>
+          <input type="text" name="full_name" required value="{% if user_rm %}{{ user_rm.name }}{% else %}{{ profile_user.first_name|default:profile_user.username }}{% endif %}"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Username</label>
+          <input type="text" value="{{ profile_user.username }}" disabled
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/50 text-slate-500 text-sm cursor-not-allowed">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Email Address</label>
+          <input type="email" name="email" value="{{ profile_user.email }}"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <button type="submit"
+                class="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-sm transition cursor-pointer">
+          Save Details
+        </button>
+      </form>
+    </div>
+
+    <!-- Card B: Change Password Form -->
+    <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 space-y-4">
+      <div class="border-b border-slate-100 dark:border-slate-800 pb-3">
+        <h3 class="text-sm font-bold text-slate-900 dark:text-white">Change Password</h3>
+        <p class="text-xs text-slate-400">Keep your account secure with a custom password</p>
+      </div>
+
+      <form method="post" action="{% url 'profile' %}" class="space-y-4">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="change_password">
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Current Password</label>
+          <input type="password" name="current_password" required placeholder="••••••••"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">New Password</label>
+          <input type="password" name="new_password" required placeholder="Minimum 4 characters"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Confirm New Password</label>
+          <input type="password" name="confirm_password" required placeholder="Repeat new password"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <button type="submit"
+                class="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white font-semibold text-xs shadow-sm transition cursor-pointer">
+          Update Password
+        </button>
+      </form>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL: ADMIN RESET ROOMMATE PASSWORD -->
+<!-- ======================================================== -->
+{% if is_admin %}
+<div id="reset-pwd-modal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+  <div class="bg-white dark:bg-slate-900 w-full max-w-sm rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4 animate-card-enter">
+    <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+      <div>
+        <h3 class="text-sm font-bold text-slate-900 dark:text-white">Reset Roommate Password</h3>
+        <p class="text-xs text-slate-400" id="reset-modal-subtitle">User: @username</p>
+      </div>
+      <button type="button" onclick="closeResetPasswordModal()" class="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center text-sm transition">
+        &times;
+      </button>
+    </div>
+
+    <form method="post" action="{% url 'profile' %}" class="space-y-4">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="reset_roommate_password">
+      <input type="hidden" name="user_id" id="reset-modal-user-id" value="">
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">New Password</label>
+        <input type="text" name="new_password" required value="admin"
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+        <p class="text-[11px] text-slate-400 mt-1">Default is 'admin' or enter a custom one.</p>
+      </div>
+
+      <button type="submit"
+              class="w-full py-2.5 px-4 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs shadow-sm transition cursor-pointer">
+        Confirm Reset &rarr;
+      </button>
+    </form>
+  </div>
+</div>
+
+<script>
+  function openResetPasswordModal(userId, username) {
+    document.getElementById('reset-modal-user-id').value = userId;
+    document.getElementById('reset-modal-subtitle').textContent = 'User: @' + username;
+    document.getElementById('reset-pwd-modal').classList.remove('hidden');
+  }
+
+  function closeResetPasswordModal() {
+    document.getElementById('reset-pwd-modal').classList.add('hidden');
+  }
+</script>
+{% endif %}
+
+{% endblock %}

@@ -10,7 +10,13 @@
             <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
             Household Splitwise Ledger
           </span>
-          <span class="text-xs text-slate-400">Viewing as <strong>{{ active_roommate.name }}</strong></span>
+          <span class="text-xs text-slate-400">
+            {% if is_admin %}
+              Viewing Household Ledger &bull; <strong class="text-amber-600 dark:text-amber-400">👑 Administrator Mode</strong>
+            {% else %}
+              Viewing as <strong>{{ active_roommate.name }}</strong>
+            {% endif %}
+          </span>
         </div>
         
         <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
@@ -61,7 +67,7 @@
       <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-5">
         <h2 class="text-base font-bold text-slate-900 dark:text-white mb-4 flex items-center justify-between">
           <span>Roommate Balances</span>
-          <span class="text-xs font-normal text-slate-400">4 Roommates</span>
+          <span class="text-xs font-normal text-slate-400">Your Standing</span>
         </h2>
 
         <div class="space-y-3">
@@ -167,7 +173,7 @@
                class="px-2.5 py-1 rounded-lg font-semibold transition {% if not selected_cat %}bg-indigo-600 text-white shadow-sm{% else %}bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white{% endif %}">
               All
             </a>
-            {% for cat in category_choices %}
+            {% for cat in category_choices %}]
             <a href="?{% if search_q %}q={{ search_q }}&{% endif %}category={{ cat.0 }}"
                class="px-2.5 py-1 rounded-lg font-semibold transition {% if selected_cat == cat.0 %}bg-indigo-600 text-white shadow-sm{% else %}bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white{% endif %}">
               {{ cat.1 }}
@@ -192,13 +198,13 @@
 
                 <!-- Category Icon -->
                 <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-lg shrink-0 {% if exp.is_payment %}bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600{% elif exp.category == 'Groceries' %}bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600{% elif exp.category == 'Utilities' %}bg-amber-50 dark:bg-amber-950/60 text-amber-600{% elif exp.category == 'Rent' %}bg-rose-50 dark:bg-rose-950/60 text-rose-600{% elif exp.category == 'Dining' %}bg-orange-50 dark:bg-orange-950/60 text-orange-600{% else %}bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300{% endif %}">
-                  {% if exp.is_payment %}&#128181;
-                  {% elif exp.category == 'Groceries' %}&#128722;
-                  {% elif exp.category == 'Utilities' %}&#128161;
-                  {% elif exp.category == 'Rent' %}&#127968;
-                  {% elif exp.category == 'Dining' %}&#127828;
-                  {% elif exp.category == 'Entertainment' %}&#127916;
-                  {% else %}&#128221;{% endif %}
+                  {% if exp.is_payment %}💵
+                  {% elif exp.category == 'Groceries' %}🛒
+                  {% elif exp.category == 'Utilities' %}💡
+                  {% elif exp.category == 'Rent' %}🏠
+                  {% elif exp.category == 'Dining' %}🍔
+                  {% elif exp.category == 'Entertainment' %}🎬
+                  {% else %}📝{% endif %}
                 </div>
 
                 <!-- Description & payer -->
@@ -219,7 +225,7 @@
                 </div>
               </div>
 
-              <!-- Right: Viewer impact + Quick actions -->
+              <!-- Right: Viewer impact + Delete (Guarded) -->
               <div class="text-right shrink-0 flex items-center gap-3">
                 <div>
                   <div class="text-xs uppercase font-semibold text-slate-400">
@@ -238,7 +244,8 @@
                   </div>
                 </div>
 
-                <!-- Delete button -->
+                <!-- Delete button (Only for payer or admin) -->
+                {% if item.can_delete %}
                 <a href="{% url 'delete_expense' exp.id %}"
                    onclick="return confirm('Delete {{ exp.description }}?');"
                    class="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition"
@@ -247,6 +254,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
                 </a>
+                {% endif %}
               </div>
             </div>
 
@@ -277,7 +285,7 @@
               <a href="?page={{ page_obj.previous_page_number }}{% if search_q %}&q={{ search_q }}{% endif %}{% if selected_cat %}&category={{ selected_cat }}{% endif %}" class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold transition">&lsaquo; Prev</a>
             {% endif %}
             <span class="px-3 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-            {% if page_obj.has_next %}
+            {% if page_obj.has_next %}]
               <a href="?page={{ page_obj.next_page_number }}{% if search_q %}&q={{ search_q }}{% endif %}{% if selected_cat %}&category={{ selected_cat }}{% endif %}" class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold transition">Next &rsaquo;</a>
               <a href="?page={{ page_obj.paginator.num_pages }}{% if search_q %}&q={{ search_q }}{% endif %}{% if selected_cat %}&category={{ selected_cat }}{% endif %}" class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold transition">Last &raquo;</a>
             {% endif %}
@@ -337,11 +345,19 @@
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Paid By</label>
+          {% if is_admin %}
           <select name="paid_by" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
             {% for r in all_roommates %}
               <option value="{{ r.id }}" {% if r.id == active_roommate.id %}selected{% endif %}>{{ r.name }}</option>
             {% endfor %}
           </select>
+          {% else %}
+          <div class="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-800 dark:text-slate-200 text-sm font-semibold flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span>{{ active_roommate.name }} (You)</span>
+            <input type="hidden" name="paid_by" value="{{ active_roommate.id }}">
+          </div>
+          {% endif %}
         </div>
         <div>
           <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Date</label>
@@ -362,6 +378,12 @@
           </label>
           {% endfor %}
         </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Notes (Optional)</label>
+        <input type="text" name="notes" placeholder="Additional details..."
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
       </div>
 
       <div class="pt-2 flex items-center justify-end gap-2.5 border-t border-slate-100 dark:border-slate-800">
@@ -453,31 +475,23 @@
   function closeSettleModal() {
     document.getElementById('settle-modal').classList.add('hidden');
   }
-
   function settleWith(myId, friendId, amount, status) {
     const payerSelect = document.getElementById('settle_payer');
     const recipientSelect = document.getElementById('settle_recipient');
     const amountInput = document.getElementById('settle_amount');
 
-    if (status === 'owes_you') {
-      // Friend owes me: Friend is paying me
-      payerSelect.value = friendId;
-      recipientSelect.value = myId;
-    } else {
-      // I owe friend: I am paying friend
+    if (status === 'you_owe') {
       payerSelect.value = myId;
       recipientSelect.value = friendId;
+    } else {
+      payerSelect.value = friendId;
+      recipientSelect.value = myId;
     }
-    amountInput.value = amount;
+
+    if (amount) {
+      amountInput.value = parseFloat(amount.replace(/[^0-9.]/g, '')).toFixed(2);
+    }
     openSettleModal();
   }
-
-  // Close modals on Escape key
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      closeExpenseModal();
-      closeSettleModal();
-    }
-  });
 </script>
 {% endblock %}

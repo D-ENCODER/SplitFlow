@@ -6,7 +6,7 @@ from django.conf import settings
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
@@ -24,15 +24,24 @@ from rcsscrapper.services import sync_receipt_to_expense, sync_all_receipts, cal
 
 
 def get_active_roommate(request):
-    """Returns the Roommate associated with the logged-in user, or the default 'Het (Me)'."""
+    """
+    Returns the Roommate associated with the logged-in user.
+    If the logged-in user is admin without an active roommate split account,
+    returns the primary household account (Het).
+    """
     ensure_roommates()
-    if request.user.is_authenticated and hasattr(request.user, 'roommate') and request.user.roommate:
-        return request.user.roommate
+    if request.user.is_authenticated:
+        if hasattr(request.user, 'roommate') and request.user.roommate and request.user.roommate.is_active:
+            return request.user.roommate
+        # Admin or staff fallback
+        het = Roommate.objects.filter(is_me=True, is_active=True).first()
+        if het:
+            return het
     return Roommate.objects.filter(is_me=True).first() or Roommate.objects.first()
 
 
 # ==========================================
-# AUTHENTICATION VIEWS
+# AUTHENTICATION & PROFILE VIEWS
 # ==========================================
 
 def login_view(request):
@@ -40,20 +49,13 @@ def login_view(request):
     error_msg = None
     next_url = request.GET.get('next') or request.POST.get('next') or reverse('splitwise_dashboard')
 
-    if request.method == 'POST':
-        # Check if 1-click quick login chip was clicked
-        quick_user = request.POST.get('quick_user')
-        if quick_user:
-            user = User.objects.filter(username=quick_user).first()
-            if user:
-                login(request, user)
-                messages.success(request, f"Welcome back, {user.roommate.name if hasattr(user, 'roommate') else user.username}!")
-                return redirect(next_url)
+    if request.user.is_authenticated:
+        return redirect(next_url)
 
+    if request.method == 'POST':
         username_or_email = request.POST.get('username', '').strip()
         password = request.POST.get('password', '')
 
-        # Authenticate by username or email
         user = authenticate(request, username=username_or_email, password=password)
         if not user:
             user_obj = User.objects.filter(email__iexact=username_or_email).first()
@@ -66,12 +68,10 @@ def login_view(request):
             messages.success(request, f"Welcome back, {rm_name}!")
             return redirect(next_url)
         else:
-            error_msg = "Invalid username or password. (Default password for all roommates is 'admin')"
+            error_msg = "Invalid username/email or password. Please try again."
 
-    roommates = list(Roommate.objects.filter(is_active=True).select_related('user'))
     return render(request, 'splitter/login.html', {
         'error_msg': error_msg,
-        'roommates': roommates,
         'next': next_url,
     })
 
@@ -79,6 +79,9 @@ def login_view(request):
 def register_view(request):
     ensure_roommates()
     error_msg = None
+
+    if request.user.is_authenticated:
+        return redirect('splitwise_dashboard')
 
     if request.method == 'POST':
         username = request.POST.get('username', '').strip().lower()
@@ -91,6 +94,8 @@ def register_view(request):
             error_msg = "Username and Full Name are required."
         elif User.objects.filter(username=username).exists():
             error_msg = f"Username '{username}' is already taken."
+        elif email and User.objects.filter(email=email).exists():
+            error_msg = f"Email '{email}' is already registered."
         elif password != password_confirm:
             error_msg = "Passwords do not match."
         elif len(password) < 4:
@@ -99,19 +104,21 @@ def register_view(request):
             user = User.objects.create_user(
                 username=username,
                 email=email or f"{username}@splitflow.local",
-                password=password
+                password=password,
+                first_name=full_name
             )
-            # Create or link Roommate profile
+            # Create or link active Roommate profile
             rm, _ = Roommate.objects.get_or_create(
                 name=full_name,
-                defaults={'user': user, 'email': user.email, 'is_me': False}
+                defaults={'user': user, 'email': user.email, 'is_me': False, 'is_active': True}
             )
             rm.user = user
             rm.email = user.email
+            rm.is_active = True
             rm.save()
 
             login(request, user)
-            messages.success(request, f"Account created! Welcome to SplitFlow, {full_name}!")
+            messages.success(request, f"Welcome to SplitFlow, {full_name}! Your profile is ready.")
             return redirect('splitwise_dashboard')
 
     return render(request, 'splitter/register.html', {
@@ -123,17 +130,6 @@ def logout_view(request):
     logout(request)
     messages.info(request, "You have been logged out.")
     return redirect('login')
-
-
-def switch_profile(request, username):
-    """1-click switch between active roommate profiles."""
-    user = User.objects.filter(username=username.lower()).first()
-    next_url = request.GET.get("next") or request.META.get("HTTP_REFERER") or reverse("splitwise_dashboard")
-    if user:
-        login(request, user)
-        rm_name = user.roommate.name if hasattr(user, "roommate") and user.roommate else user.username
-        messages.success(request, f"Viewing as {rm_name}!")
-    return redirect(next_url)
 
 
 def forgot_password_view(request):
@@ -155,17 +151,134 @@ def forgot_password_view(request):
             error_msg = "Please enter a new password."
         elif new_password != confirm_password:
             error_msg = "Passwords do not match."
+        elif len(new_password) < 4:
+            error_msg = "Password must be at least 4 characters."
         else:
             user.set_password(new_password)
             user.save()
             messages.success(request, f"Password successfully updated for {user.username}! You can now log in.")
             return redirect('login')
 
-    roommates = list(Roommate.objects.filter(is_active=True).select_related('user'))
     return render(request, 'splitter/forgot_password.html', {
-        'roommates': roommates,
         'message': message,
         'error_msg': error_msg,
+    })
+
+
+@login_required(login_url='login')
+def profile_view(request):
+    """
+    Dedicated Profile view:
+    - User details (name, username, email, member since)
+    - Role badge (Administrator vs Roommate)
+    - Personal Ledger standing & debt breakdown
+    - Profile update and password change actions
+    - Admin-only management tools (roommate roster, status toggle, password reset, stats)
+    """
+    ensure_roommates()
+    user = request.user
+    is_admin = bool(user.is_superuser or user.is_staff or user.username == 'admin')
+    user_rm = getattr(user, 'roommate', None)
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'update_profile':
+            full_name = request.POST.get('full_name', '').strip()
+            email = request.POST.get('email', '').strip()
+
+            if not full_name:
+                messages.error(request, "Full name cannot be blank.")
+            else:
+                user.first_name = full_name
+                if email:
+                    user.email = email
+                user.save()
+
+                if user_rm:
+                    user_rm.name = full_name
+                    if email:
+                        user_rm.email = email
+                    user_rm.save()
+                messages.success(request, "Profile details updated successfully!")
+            return redirect('profile')
+
+        elif action == 'change_password':
+            current_pwd = request.POST.get('current_password', '')
+            new_pwd = request.POST.get('new_password', '')
+            confirm_pwd = request.POST.get('confirm_password', '')
+
+            if not user.check_password(current_pwd):
+                messages.error(request, "Current password is incorrect.")
+            elif not new_pwd or len(new_pwd) < 4:
+                messages.error(request, "New password must be at least 4 characters.")
+            elif new_pwd != confirm_pwd:
+                messages.error(request, "New passwords do not match.")
+            else:
+                user.set_password(new_pwd)
+                user.save()
+                update_session_auth_hash(request, user)
+                messages.success(request, "Your password has been changed successfully!")
+            return redirect('profile')
+
+        elif action == 'toggle_roommate_status' and is_admin:
+            rm_id = request.POST.get('roommate_id')
+            target_rm = get_object_or_404(Roommate, id=rm_id)
+            target_rm.is_active = not target_rm.is_active
+            target_rm.save()
+            messages.success(request, f"Roommate {target_rm.name} is now {'Active' if target_rm.is_active else 'Inactive'}.")
+            return redirect('profile')
+
+        elif action == 'reset_roommate_password' and is_admin:
+            target_user_id = request.POST.get('user_id')
+            new_pwd = request.POST.get('new_password', '').strip() or 'admin'
+            target_user = get_object_or_404(User, id=target_user_id)
+            target_user.set_password(new_pwd)
+            target_user.save()
+            messages.success(request, f"Password for {target_user.username} was reset to '{new_pwd}'.")
+            return redirect('profile')
+
+    # Personal finance stats if linked to an active roommate
+    personal_summary = None
+    total_paid = Decimal('0.00')
+    total_share = Decimal('0.00')
+
+    if user_rm and user_rm.is_active:
+        ledger_data = calculate_balances(current_roommate=user_rm)
+        personal_summary = ledger_data['user_summary']
+
+        total_paid = sum(
+            Expense.objects.filter(paid_by=user_rm, is_payment=False).values_list('amount', flat=True)
+        )
+        total_share = sum(
+            ExpenseSplit.objects.filter(roommate=user_rm, expense__is_payment=False).values_list('amount', flat=True)
+        )
+
+    # Admin data
+    all_roommates_admin = []
+    system_stats = {}
+    if is_admin:
+        all_roommates_admin = list(Roommate.objects.all().select_related('user').order_by('-is_active', 'name'))
+        total_exp_count = Expense.objects.count()
+        total_exp_spent = sum(Expense.objects.filter(is_payment=False).values_list('amount', flat=True))
+        total_receipts_count = Receipt.objects.count()
+        system_stats = {
+            'total_exp_count': total_exp_count,
+            'total_exp_spent': total_exp_spent,
+            'total_receipts_count': total_receipts_count,
+            'total_users_count': User.objects.count(),
+            'tailscale_url': 'https://sosuke-aizen.warg-rainbow.ts.net:8443',
+        }
+
+    return render(request, 'splitter/profile.html', {
+        'profile_user': user,
+        'user_rm': user_rm,
+        'is_admin': is_admin,
+        'personal_summary': personal_summary,
+        'total_paid': total_paid,
+        'total_share': total_share,
+        'all_roommates_admin': all_roommates_admin,
+        'system_stats': system_stats,
     })
 
 
@@ -173,17 +286,19 @@ def forgot_password_view(request):
 # SPLITWISE CORE EXPENSES & LEDGER VIEWS
 # ==========================================
 
+@login_required(login_url='login')
 def splitwise_dashboard(request):
     """
     Main Splitwise dashboard:
+    - User is strictly locked to their own account perspective
     - Net household balance summary
     - Friend-by-friend debt breakdown
     - Chronological shared expenses & settlements feed
-    - Quick actions to add expenses or settle up
     """
     sync_receipts_folder()
     sync_all_receipts()
     active_roommate = get_active_roommate(request)
+    is_admin = bool(request.user.is_superuser or request.user.is_staff or request.user.username == 'admin')
 
     ledger_data = calculate_balances(current_roommate=active_roommate)
     all_roommates = ledger_data['all_roommates']
@@ -231,9 +346,9 @@ def splitwise_dashboard(request):
             'impact': impact,
             'impact_type': impact_type,
             'viewer_share': viewer_share,
+            'can_delete': is_admin or (exp.paid_by_id == active_roommate.id),
         })
 
-    # Stats for grocery scraper
     inbox_receipts_count = Receipt.objects.filter(is_archived=False).count()
     pending_receipts_count = Receipt.objects.filter(is_archived=False, processed=False).count()
 
@@ -271,21 +386,30 @@ def splitwise_dashboard(request):
         'inbox_receipts_count': inbox_receipts_count,
         'pending_receipts_count': pending_receipts_count,
         'category_choices': Expense.CATEGORY_CHOICES,
+        'is_admin': is_admin,
     })
 
 
+@login_required(login_url='login')
 def add_expense(request):
     """Create a manual shared expense split equally or with exact custom amounts."""
     active_roommate = get_active_roommate(request)
     roommates = list(Roommate.objects.filter(is_active=True))
+    is_admin = bool(request.user.is_superuser or request.user.is_staff or request.user.username == 'admin')
 
     if request.method == 'POST':
         desc = request.POST.get('description', '').strip()
         amount_raw = request.POST.get('amount', '0').strip().replace('$', '')
         category = request.POST.get('category', 'General')
-        paid_by_id = request.POST.get('paid_by')
         notes = request.POST.get('notes', '').strip()
         date_str = request.POST.get('date')
+
+        # Non-admin users can only record expenses paid by themselves
+        if is_admin:
+            paid_by_id = request.POST.get('paid_by')
+            payer = Roommate.objects.filter(id=paid_by_id).first() or active_roommate
+        else:
+            payer = active_roommate
 
         try:
             total_amount = Decimal(amount_raw)
@@ -297,7 +421,6 @@ def add_expense(request):
             messages.error(request, "Expense amount must be greater than $0.")
             return redirect('splitwise_dashboard')
 
-        payer = Roommate.objects.filter(id=paid_by_id).first() or active_roommate
         exp_date = timezone.now().date()
         if date_str:
             try:
@@ -310,19 +433,16 @@ def add_expense(request):
 
         splits_to_create = {}
         if split_type == 'equal':
-            # Split equally among selected roommates (or all if none selected)
             target_rms = [r for r in roommates if str(r.id) in selected_rms] if selected_rms else roommates
             if not target_rms:
                 target_rms = roommates
             n = len(target_rms)
             base_share = (total_amount / Decimal(n)).quantize(Decimal('0.01'))
             splits_to_create = {r: base_share for r in target_rms}
-            # Adjust penny remainder onto payer or first participant
             diff = total_amount - sum(splits_to_create.values())
             first_rm = next((r for r in target_rms if r == payer), target_rms[0])
             splits_to_create[first_rm] += diff
         else:
-            # Custom exact amounts specified in POST
             for r in roommates:
                 val = request.POST.get(f'exact_amount_{r.id}', '0').strip().replace('$', '')
                 try:
@@ -359,10 +479,11 @@ def add_expense(request):
     return redirect('splitwise_dashboard')
 
 
+@login_required(login_url='login')
 def settle_up(request):
     """Record a debt settlement payment between two roommates."""
     active_roommate = get_active_roommate(request)
-    roommates = list(Roommate.objects.filter(is_active=True))
+    is_admin = bool(request.user.is_superuser or request.user.is_staff or request.user.username == 'admin')
 
     if request.method == 'POST':
         payer_id = request.POST.get('payer_id')
@@ -388,6 +509,11 @@ def settle_up(request):
         payer = get_object_or_404(Roommate, id=payer_id)
         recipient = get_object_or_404(Roommate, id=recipient_id)
 
+        # Non-admin roommates must be a party in the payment
+        if not is_admin and active_roommate.id not in [payer.id, recipient.id]:
+            messages.error(request, "Permission denied: You must be either the payer or the recipient in this settlement.")
+            return redirect('splitwise_dashboard')
+
         pay_date = timezone.now().date()
         if date_str:
             try:
@@ -412,13 +538,21 @@ def settle_up(request):
     return redirect('splitwise_dashboard')
 
 
+@login_required(login_url='login')
 def delete_expense(request, expense_id):
-    """Delete a shared expense or settlement payment."""
+    """Delete a shared expense or settlement payment (permission guarded)."""
     expense = get_object_or_404(Expense, id=expense_id)
+    active_roommate = get_active_roommate(request)
+    is_admin = bool(request.user.is_superuser or request.user.is_staff or request.user.username == 'admin')
+
+    # Guard: only the person who paid or an administrator can delete
+    if not is_admin and expense.paid_by_id != active_roommate.id:
+        messages.error(request, "Permission denied: You can only delete expenses that you paid for.")
+        return redirect('splitwise_dashboard')
+
     desc = expense.description
     amt = expense.amount
 
-    # If linked to a receipt, detach rather than delete receipt
     if expense.receipt:
         expense.receipt = None
         expense.save()
@@ -491,11 +625,11 @@ def delete_receipts_and_files(queryset):
                 os.remove(filepath)
             except OSError:
                 pass
-        # Also clean up any linked Expense
         Expense.objects.filter(receipt=rec).delete()
     queryset.delete()
 
 
+@login_required(login_url='login')
 def delete_receipt(request, receipt_id):
     receipt = get_object_or_404(Receipt, id=receipt_id)
     was_archived = receipt.is_archived
@@ -514,6 +648,7 @@ def latex_escape(text):
     return ''.join(conv.get(c, c) for c in str(text))
 
 
+@login_required(login_url='login')
 def receipt_list(request):
     sync_receipts_folder()
     show_archived = request.GET.get('archived') == '1'
@@ -553,6 +688,7 @@ def receipt_list(request):
     })
 
 
+@login_required(login_url='login')
 def toggle_archive_receipt(request, receipt_id):
     receipt = get_object_or_404(Receipt, id=receipt_id)
     receipt.is_archived = not receipt.is_archived
@@ -560,6 +696,7 @@ def toggle_archive_receipt(request, receipt_id):
     return redirect('receipt_list')
 
 
+@login_required(login_url='login')
 def batch_process(request):
     ensure_roommates()
     ids_param = request.GET.get('ids', '')
@@ -773,6 +910,7 @@ def build_summary_data(receipt_ids):
     }
 
 
+@login_required(login_url='login')
 def batch_summary(request):
     ids_param = request.GET.get('ids', '')
     receipt_ids = [int(x) for x in ids_param.split(',') if x.isdigit()]
@@ -791,6 +929,7 @@ def batch_summary(request):
     return render(request, 'splitter/summary.html', data)
 
 
+@login_required(login_url='login')
 def export_latex_pdf(request):
     ids_param = request.GET.get('ids', '')
     receipt_ids = [int(x) for x in ids_param.split(',') if x.isdigit()]
@@ -888,6 +1027,7 @@ def export_latex_pdf(request):
             return response
 
 
+@login_required(login_url='login')
 def analytics_dashboard(request):
     sync_receipts_folder()
     ensure_roommates()
@@ -898,9 +1038,6 @@ def analytics_dashboard(request):
 
     active_roommates = list(Roommate.objects.filter(is_active=True))
 
-    # ==========================================
-    # 1. HOUSEHOLD & SPLITWISE DATA (1,369 records)
-    # ==========================================
     splitwise_expenses = list(
         Expense.objects.filter(is_payment=False)
         .select_related("paid_by")
@@ -938,7 +1075,6 @@ def analytics_dashboard(request):
     month_labels = [monthly_dates[m].strftime("%b '%y") for m in sorted_months]
     month_totals_float = [float(monthly_totals[m]) for m in sorted_months]
 
-    # Category breakdown sorted descending
     sorted_categories = sorted(
         [
             {
@@ -953,7 +1089,6 @@ def analytics_dashboard(request):
         reverse=True
     )
 
-    # Roommate comparisons
     roommate_comparisons = []
     for r in active_roommates:
         paid = payer_totals[r.name].quantize(Decimal("0.01"))
@@ -968,7 +1103,6 @@ def analytics_dashboard(request):
             "pct": pct,
         })
 
-    # Top largest household expenses
     top_household_expenses = list(
         Expense.objects.filter(is_payment=False)
         .select_related("paid_by")
@@ -996,9 +1130,7 @@ def analytics_dashboard(request):
         "roommate_share": [float(share_totals[r.name]) for r in active_roommates],
     }
 
-    # ==========================================
-    # 2. SUPERSTORE GROCERY RECEIPT DATA
-    # ==========================================
+    # Superstore Grocery Receipt Data
     receipts = list(Receipt.objects.all().order_by("file_modified_at", "id"))
     num_active_rms = len(active_roommates)
 
@@ -1083,7 +1215,6 @@ def analytics_dashboard(request):
 
     return render(request, "splitter/analytics.html", {
         "active_tab": active_tab,
-        # Household stats
         "total_household_spent": total_household_spent.quantize(Decimal("0.01")),
         "household_count": household_count,
         "active_months_count": active_months_count,
@@ -1095,7 +1226,6 @@ def analytics_dashboard(request):
         "roommate_comparisons": roommate_comparisons,
         "top_household_expenses": top_household_expenses,
         "household_chart_json": json.dumps(household_chart_payload),
-        # Superstore stats
         "superstore_spent": superstore_spent.quantize(Decimal("0.01")),
         "superstore_tax": superstore_tax.quantize(Decimal("0.01")),
         "superstore_avg_bill": superstore_avg_bill,

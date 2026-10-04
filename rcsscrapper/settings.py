@@ -47,6 +47,10 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
 USE_X_FORWARDED_PORT = True
 
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'splitwise_dashboard'
+LOGOUT_REDIRECT_URL = 'login'
+
 
 # Application definition
 
@@ -73,7 +77,7 @@ MIDDLEWARE = [
 ROOT_URLCONF = 'rcsscrapper.urls'
 
 TEMPLATES = [
-    {\
+    {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [BASE_DIR / 'templates']
         ,

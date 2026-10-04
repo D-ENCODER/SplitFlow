@@ -10,6 +10,7 @@ urlpatterns = [
     
     # Splitwise Core Routes
     path('', views.splitwise_dashboard, name='splitwise_dashboard'),
+    path('profile/', views.profile_view, name='profile'),
     path('expenses/add/', views.add_expense, name='add_expense'),
     path('expenses/settle/', views.settle_up, name='settle_up'),
     path('expenses/<int:expense_id>/delete/', views.delete_expense, name='delete_expense'),
@@ -19,7 +20,6 @@ urlpatterns = [
     path('register/', views.register_view, name='register'),
     path('logout/', views.logout_view, name='logout'),
     path('forgot-password/', views.forgot_password_view, name='forgot_password'),
-    path('switch-profile/<str:username>/', views.switch_profile, name='switch_profile'),
 
     # Superstore Grocery Inbox & Assign Routes
     path('receipts/', views.receipt_list, name='receipt_list'),
@@ -30,6 +30,7 @@ urlpatterns = [
     path('analytics/', views.analytics_dashboard, name='analytics_dashboard'),
     path('receipt/<int:receipt_id>/toggle-archive/', views.toggle_archive_receipt, name='toggle_archive_receipt'),
     path('receipt/<int:receipt_id>/delete/', views.delete_receipt, name='delete_receipt'),
+
     # PWA Routes
     path('manifest.json', views.manifest_view, name='manifest'),
     path('sw.js', views.service_worker_view, name='service_worker'),

@@ -1,8 +1,8 @@
 import os
 from django.conf import settings
-from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, re_path
+from django.contrib.staticfiles.views import serve as static_serve
 from rcsscrapper import views
 
 urlpatterns = [
@@ -34,4 +34,7 @@ urlpatterns = [
     # PWA Routes
     path('manifest.json', views.manifest_view, name='manifest'),
     path('sw.js', views.service_worker_view, name='service_worker'),
-] + static(settings.STATIC_URL, document_root=os.path.join(settings.BASE_DIR, "rcsscrapper", "static"))
+
+    # Static assets serving for all apps (including Django admin styles and scripts)
+    re_path(r'^static/(?P<path>.*)$', static_serve, {'insecure': True}),
+]

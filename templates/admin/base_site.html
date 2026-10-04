@@ -1,0 +1,346 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | {{ site_title|default:'SplitFlow Admin' }}{% endblock %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    /* ======================================================== */
+    /* SPLITFLOW MODERN DJANGO ADMIN THEME */
+    /* ======================================================== */
+    :root {
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --secondary: #6366f1;
+      --accent: #f59e0b;
+      --font-family-primary: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      font-family: var(--font-family-primary) !important;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Header & Branding */
+    #header {
+      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 60%, #4338ca 100%) !important;
+      color: #ffffff !important;
+      padding: 12px 24px !important;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    #branding {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #branding h1 {
+      margin: 0 !important;
+      padding: 0 !important;
+      font-weight: 800 !important;
+      font-size: 1.15rem !important;
+      letter-spacing: -0.02em;
+    }
+
+    #branding h1 a:link, #branding h1 a:visited {
+      color: #ffffff !important;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+
+    .splitflow-admin-logo {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 8px;
+      font-weight: 900;
+      font-size: 14px;
+      color: #ffffff;
+    }
+
+    .splitflow-badge {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: #f59e0b;
+      color: #78350f;
+      padding: 2px 7px;
+      border-radius: 9999px;
+      margin-left: 6px;
+    }
+
+    /* Return to App Button */
+    .app-return-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #ffffff !important;
+      padding: 5px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.15s ease;
+      margin-right: 12px;
+    }
+    .app-return-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: translateY(-1px);
+    }
+
+    /* User Tools */
+    #user-tools {
+      font-size: 12px !important;
+      font-weight: 500 !important;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: rgba(255, 255, 255, 0.8) !important;
+    }
+
+    #user-tools a {
+      color: #ffffff !important;
+      border-bottom: none !important;
+      font-weight: 600;
+    }
+
+    /* Breadcrumbs */
+    div.breadcrumbs {
+      background: #f8fafc !important;
+      border-bottom: 1px solid #e2e8f0 !important;
+      padding: 10px 24px !important;
+      font-size: 12px !important;
+      color: #64748b !important;
+    }
+    div.breadcrumbs a {
+      color: #4f46e5 !important;
+      font-weight: 600;
+    }
+
+    /* Content Area & Modules */
+    #content {
+      padding: 24px !important;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .module {
+      border-radius: 14px !important;
+      border: 1px solid #e2e8f0 !important;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+      overflow: hidden;
+      margin-bottom: 24px !important;
+      background: #ffffff;
+    }
+
+    .module caption, .module h2 {
+      background: #f8fafc !important;
+      color: #1e293b !important;
+      font-weight: 700 !important;
+      font-size: 13px !important;
+      padding: 12px 18px !important;
+      border-bottom: 1px solid #e2e8f0 !important;
+    }
+
+    /* Modern Table Rows */
+    #changelist table {
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    #changelist table thead th {
+      background: #f1f5f9 !important;
+      color: #475569 !important;
+      font-size: 11px !important;
+      font-weight: 700 !important;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid #e2e8f0 !important;
+      padding: 10px 14px !important;
+    }
+
+    #changelist table tbody tr:hover {
+      background-color: #f8fafc !important;
+    }
+
+    #changelist table td, #changelist table th {
+      padding: 10px 14px !important;
+      border-bottom: 1px solid #f1f5f9 !important;
+      font-size: 13px !important;
+    }
+
+    /* Buttons */
+    .button, input[type=submit], input[type=button], .submit-row input, a.button {
+      background: #4f46e5 !important;
+      color: #ffffff !important;
+      font-family: var(--font-family-primary) !important;
+      font-weight: 600 !important;
+      font-size: 12px !important;
+      padding: 8px 16px !important;
+      border-radius: 8px !important;
+      border: none !important;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(79, 70, 229, 0.2) !important;
+      transition: all 0.15s ease !important;
+    }
+
+    .button:hover, input[type=submit]:hover, input[type=button]:hover, .submit-row input:hover {
+      background: #4338ca !important;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(79, 70, 229, 0.3) !important;
+    }
+
+    .button.default, input[type=submit].default {
+      background: #4f46e5 !important;
+    }
+
+    /* Search & Filters */
+    #toolbar {
+      background: #f8fafc !important;
+      border: 1px solid #e2e8f0 !important;
+      border-radius: 10px !important;
+      padding: 12px !important;
+      margin-bottom: 16px !important;
+    }
+
+    #searchbar {
+      border: 1px solid #cbd5e1 !important;
+      border-radius: 8px !important;
+      padding: 6px 12px !important;
+      font-size: 13px !important;
+      font-family: var(--font-family-primary) !important;
+    }
+
+    #searchbar:focus {
+      outline: none !important;
+      border-color: #6366f1 !important;
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
+    }
+
+    #changelist-filter {
+      border-radius: 12px !important;
+      border: 1px solid #e2e8f0 !important;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+    }
+
+    #changelist-filter h2 {
+      background: #f1f5f9 !important;
+      font-size: 12px !important;
+      font-weight: 700 !important;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Inlines */
+    .inline-group {
+      border-radius: 12px !important;
+      border: 1px solid #e2e8f0 !important;
+      overflow: hidden;
+      margin-bottom: 20px !important;
+    }
+
+    .inline-group h2 {
+      background: #f8fafc !important;
+      color: #1e293b !important;
+      font-weight: 700 !important;
+      border-bottom: 1px solid #e2e8f0 !important;
+    }
+
+    /* Dark Mode Support for Admin */
+    @media (prefers-color-scheme: dark) {
+      body {
+        background-color: #0b0f19 !important;
+        color: #f1f5f9 !important;
+      }
+      div.breadcrumbs {
+        background: #111827 !important;
+        border-bottom-color: #1f2937 !important;
+        color: #94a3b8 !important;
+      }
+      .module {
+        background: #111827 !important;
+        border-color: #1f2937 !important;
+      }
+      .module caption, .module h2 {
+        background: #1e293b !important;
+        color: #f8fafc !important;
+        border-bottom-color: #334155 !important;
+      }
+      #changelist table thead th {
+        background: #1e293b !important;
+        color: #cbd5e1 !important;
+        border-bottom-color: #334155 !important;
+      }
+      #changelist table tbody tr:hover {
+        background-color: #1e293b !important;
+      }
+      #changelist table td, #changelist table th {
+        border-bottom-color: #1f2937 !important;
+      }
+      #toolbar {
+        background: #111827 !important;
+        border-color: #1f2937 !important;
+      }
+      #searchbar {
+        background: #1e293b !important;
+        color: #f8fafc !important;
+        border-color: #334155 !important;
+      }
+      #changelist-filter {
+        background: #111827 !important;
+        border-color: #1f2937 !important;
+      }
+      #changelist-filter h2 {
+        background: #1e293b !important;
+        color: #cbd5e1 !important;
+      }
+      .inline-group {
+        background: #111827 !important;
+        border-color: #1f2937 !important;
+      }
+      .inline-group h2 {
+        background: #1e293b !important;
+        color: #f8fafc !important;
+        border-bottom-color: #334155 !important;
+      }
+    }
+  </style>
+{% endblock %}
+
+{% block branding %}
+<div id="branding">
+  <h1>
+    <a href="{% url 'admin:index' %}">
+      <span class="splitflow-admin-logo">S</span>
+      <span>SplitFlow Administration</span>
+      <span class="splitflow-badge">Admin</span>
+    </a>
+  </h1>
+</div>
+{% endblock %}
+
+{% block userlinks %}
+  <a href="{% url 'splitwise_dashboard' %}" class="app-return-btn">
+    <svg style="width:13px; height:13px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+    </svg>
+    <span>Return to SplitFlow</span>
+  </a>
+  {{ block.super }}
+{% endblock %}

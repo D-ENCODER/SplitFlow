@@ -1,0 +1,154 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static "admin/css/dashboard.css" %}">
+  <style>
+    .admin-hero-card {
+      background: linear-gradient(135deg, rgba(79, 70, 229, 0.08) 0%, rgba(99, 102, 241, 0.03) 100%);
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      border-radius: 14px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .admin-hero-title {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: #312e81;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .admin-hero-desc {
+      font-size: 13px;
+      color: #475569;
+      margin: 0;
+      line-height: 1.5;
+    }
+    .admin-quick-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .admin-quick-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #334155;
+      text-decoration: none;
+      transition: all 0.15s ease;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    }
+    .admin-quick-btn:hover {
+      background: #f8fafc;
+      border-color: #6366f1;
+      color: #4f46e5;
+      transform: translateY(-1px);
+    }
+    @media (prefers-color-scheme: dark) {
+      .admin-hero-card {
+        background: linear-gradient(135deg, rgba(79, 70, 229, 0.15) 0%, rgba(30, 27, 75, 0.4) 100%);
+        border-color: rgba(99, 102, 241, 0.3);
+      }
+      .admin-hero-title {
+        color: #c7d2fe;
+      }
+      .admin-hero-desc {
+        color: #94a3b8;
+      }
+      .admin-quick-btn {
+        background: #1e293b;
+        border-color: #334155;
+        color: #cbd5e1;
+      }
+      .admin-quick-btn:hover {
+        background: #334155;
+        color: #ffffff;
+      }
+    }
+  </style>
+{% endblock %}
+
+{% block coltype %}colMS{% endblock %}
+
+{% block bodyclass %}{{ block.super }} dashboard{% endblock %}
+
+{% block nav-breadcrumbs %}{% endblock %}
+
+{% block nav-sidebar %}{% endblock %}
+
+{% block content %}
+<div id="content-main">
+
+  <!-- Welcome / Quick Action Banner -->
+  <div class="admin-hero-card">
+    <div class="admin-hero-title">
+      <span>👑</span>
+      <span>SplitFlow System Administration</span>
+    </div>
+    <p class="admin-hero-desc">
+      Manage active household roommates, historical shared expenses, debt settlement splits, and automated Real Canadian Superstore grocery order receipts.
+    </p>
+    <div class="admin-quick-links">
+      <a href="{% url 'splitwise_dashboard' %}" class="admin-quick-btn">
+        <span>🏠 View Household Ledger</span>
+      </a>
+      <a href="{% url 'analytics_dashboard' %}" class="admin-quick-btn">
+        <span>📊 View Living Analytics</span>
+      </a>
+      <a href="{% url 'receipt_list' %}" class="admin-quick-btn">
+        <span>🛒 Superstore Receipt Inbox</span>
+      </a>
+      <a href="{% url 'profile' %}" class="admin-quick-btn">
+        <span>👤 Administrator Profile</span>
+      </a>
+    </div>
+  </div>
+
+  {% include "admin/app_list.html" with app_list=app_list show_changelinks=True %}
+</div>
+{% endblock %}
+
+{% block sidebar %}
+<div id="content-related">
+    <div class="module" id="recent-actions-module">
+        <h2>{% translate 'Recent actions' %}</h2>
+        <h3>{% translate 'My actions' %}</h3>
+            {% load log %}
+            {% get_admin_log 10 as admin_log for_user user %}
+            {% if not admin_log %}
+            <p>{% translate 'None available' %}</p>
+            {% else %}
+            <ul class="actionlist">
+            {% for entry in admin_log %}
+            <li class="{% if entry.is_addition %}addlink{% endif %}{% if entry.is_change %}changelink{% endif %}{% if entry.is_deletion %}deletelink{% endif %}">
+                {% if entry.is_deletion or not entry.get_admin_url %}
+                    {{ entry.object_repr }}
+                {% else %}
+                    <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
+                {% endif %}
+                <br>
+                {% if entry.content_type %}
+                    <span class="mini quiet">{% filter capfirst %}{{ entry.content_type.name }}{% endfilter %}</span>
+                {% else %}
+                    <span class="mini quiet">{% translate 'Unknown content' %}</span>
+                {% endif %}
+            </li>
+            {% endfor %}
+            </ul>
+            {% endif %}
+    </div>
+</div>
+{% endblock %}

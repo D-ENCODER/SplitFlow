@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="docs/images/splitflow_logo.png" alt="SplitFlow Logo" width="130" height="130" style="border-radius: 28px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3);" />
+  <img src="data/ascii-art-text.png" alt="SplitFlow Logo" height="110" style="object-fit: contain; margin-bottom: 10px;" />
 
 # SplitFlow
 

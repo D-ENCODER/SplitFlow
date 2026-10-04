@@ -133,7 +133,8 @@
           <span>Analytics</span>
         </a>
 
-        <!-- Superstore Grocery Inbox -->
+        {% if nav_is_admin %}
+        <!-- Superstore Grocery Inbox (Admin Only) -->
         <a href="{% url 'receipt_list' %}"
            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all {% if request.resolver_match.url_name in 'receipt_list,batch_process,batch_summary' %}bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 font-bold{% else %}text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60{% endif %}">
           <svg class="w-4 h-4 shrink-0 {% if request.resolver_match.url_name in 'receipt_list,batch_process,batch_summary' %}text-indigo-600 dark:text-indigo-400{% else %}text-slate-400 dark:text-slate-500{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -146,6 +147,7 @@
           </span>
           {% endif %}
         </a>
+        {% endif %}
       </nav>
 
       <!-- Right: PWA Install Chip, Dark Mode Toggle & Role-Based Profile Menu -->
@@ -330,7 +332,8 @@
         <span>Analytics</span>
       </a>
 
-      <!-- Superstore Inbox -->
+      {% if nav_is_admin %}
+      <!-- Superstore Inbox (Admin only) -->
       <a href="{% url 'receipt_list' %}"
          class="relative flex flex-col items-center gap-1 text-[11px] font-semibold {% if request.resolver_match.url_name in 'receipt_list,batch_process,batch_summary' %}text-indigo-600 dark:text-indigo-400{% else %}text-slate-400 dark:text-slate-500{% endif %}">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -343,6 +346,7 @@
         </span>
         {% endif %}
       </a>
+      {% endif %}
 
       <!-- Profile Tab -->
       {% if request.user.is_authenticated %}

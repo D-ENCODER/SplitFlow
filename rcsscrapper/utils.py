@@ -19,7 +19,7 @@ def ensure_roommates():
         admin_user = User.objects.create_superuser(
             username='admin',
             email='admin@splitflow.local',
-            password='Hado#33Sokastsui'
+            password='Hado#33Sokatsui'
         )
     else:
         if not admin_user.is_superuser or not admin_user.is_staff:
@@ -100,10 +100,10 @@ def parse_tax_from_soup(soup):
 
 
 def parse_order_total_from_soup(soup):
-    for selector in [
-        '.order-summary-total-item--trimmed__estimated-total .order-summary-total-item__values',
-        '.inprogress-payment-summary__total .order-summary-total-item__values',
-        '.preparing-order-summary .order-summary-sub-total__values',
+    for selector in [\
+        '.order-summary-total-item--trimmed__estimated-total .order-summary-total-item__values',\
+        '.inprogress-payment-summary__total .order-summary-total-item__values',\
+        '.preparing-order-summary .order-summary-sub-total__values',\
     ]:
         el = soup.select_one(selector)
         if el:

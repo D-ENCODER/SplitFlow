@@ -22,6 +22,24 @@ from rcsscrapper.models import Receipt, ReceiptItem, Roommate, ItemShare, Expens
 from rcsscrapper.utils import sync_receipts_folder, ensure_roommates, INBOX_DIR
 from rcsscrapper.services import sync_receipt_to_expense, sync_all_receipts, calculate_balances
 
+from functools import wraps
+
+def is_admin_user(user):
+    return bool(user and user.is_authenticated and (user.is_superuser or user.is_staff or user.username == 'admin'))
+
+
+def admin_required(view_func):
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect(f"{reverse('login')}?next={request.path}")
+        if not is_admin_user(request.user):
+            messages.error(request, "Permission denied: The Superstore Receipt Inbox is restricted to administrators.")
+            return redirect('splitwise_dashboard')
+        return view_func(request, *args, **kwargs)
+    return _wrapped_view
+
+
 
 def get_active_roommate(request):
     """
@@ -177,7 +195,7 @@ def profile_view(request):
     """
     ensure_roommates()
     user = request.user
-    is_admin = bool(user.is_superuser or user.is_staff or user.username == 'admin')
+    is_admin = is_admin_user(user)
     user_rm = getattr(user, 'roommate', None)
 
     if request.method == 'POST':
@@ -298,7 +316,7 @@ def splitwise_dashboard(request):
     sync_receipts_folder()
     sync_all_receipts()
     active_roommate = get_active_roommate(request)
-    is_admin = bool(request.user.is_superuser or request.user.is_staff or request.user.username == 'admin')
+    is_admin = is_admin_user(request.user)
 
     ledger_data = calculate_balances(current_roommate=active_roommate)
     all_roommates = ledger_data['all_roommates']
@@ -395,7 +413,7 @@ def add_expense(request):
     """Create a manual shared expense split equally or with exact custom amounts."""
     active_roommate = get_active_roommate(request)
     roommates = list(Roommate.objects.filter(is_active=True))
-    is_admin = bool(request.user.is_superuser or request.user.is_staff or request.user.username == 'admin')
+    is_admin = is_admin_user(request.user)
 
     if request.method == 'POST':
         desc = request.POST.get('description', '').strip()
@@ -483,7 +501,7 @@ def add_expense(request):
 def settle_up(request):
     """Record a debt settlement payment between two roommates."""
     active_roommate = get_active_roommate(request)
-    is_admin = bool(request.user.is_superuser or request.user.is_staff or request.user.username == 'admin')
+    is_admin = is_admin_user(request.user)
 
     if request.method == 'POST':
         payer_id = request.POST.get('payer_id')
@@ -543,7 +561,7 @@ def delete_expense(request, expense_id):
     """Delete a shared expense or settlement payment (permission guarded)."""
     expense = get_object_or_404(Expense, id=expense_id)
     active_roommate = get_active_roommate(request)
-    is_admin = bool(request.user.is_superuser or request.user.is_staff or request.user.username == 'admin')
+    is_admin = is_admin_user(request.user)
 
     # Guard: only the person who paid or an administrator can delete
     if not is_admin and expense.paid_by_id != active_roommate.id:
@@ -629,7 +647,7 @@ def delete_receipts_and_files(queryset):
     queryset.delete()
 
 
-@login_required(login_url='login')
+@admin_required
 def delete_receipt(request, receipt_id):
     receipt = get_object_or_404(Receipt, id=receipt_id)
     was_archived = receipt.is_archived
@@ -648,7 +666,7 @@ def latex_escape(text):
     return ''.join(conv.get(c, c) for c in str(text))
 
 
-@login_required(login_url='login')
+@admin_required
 def receipt_list(request):
     sync_receipts_folder()
     show_archived = request.GET.get('archived') == '1'
@@ -688,7 +706,7 @@ def receipt_list(request):
     })
 
 
-@login_required(login_url='login')
+@admin_required
 def toggle_archive_receipt(request, receipt_id):
     receipt = get_object_or_404(Receipt, id=receipt_id)
     receipt.is_archived = not receipt.is_archived
@@ -696,7 +714,7 @@ def toggle_archive_receipt(request, receipt_id):
     return redirect('receipt_list')
 
 
-@login_required(login_url='login')
+@admin_required
 def batch_process(request):
     ensure_roommates()
     ids_param = request.GET.get('ids', '')
@@ -910,7 +928,7 @@ def build_summary_data(receipt_ids):
     }
 
 
-@login_required(login_url='login')
+@admin_required
 def batch_summary(request):
     ids_param = request.GET.get('ids', '')
     receipt_ids = [int(x) for x in ids_param.split(',') if x.isdigit()]
@@ -929,7 +947,7 @@ def batch_summary(request):
     return render(request, 'splitter/summary.html', data)
 
 
-@login_required(login_url='login')
+@admin_required
 def export_latex_pdf(request):
     ids_param = request.GET.get('ids', '')
     receipt_ids = [int(x) for x in ids_param.split(',') if x.isdigit()]

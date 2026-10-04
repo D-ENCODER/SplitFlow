@@ -8,7 +8,7 @@ def splitflow_context(request):
     - nav_active_roommates: list of active roommates (Het, Ruchit, Tirth, Maurya)
     - nav_current_roommate: currently authenticated roommate profile (or None)
     - nav_is_admin: True if user is administrator / superuser / staff
-    - nav_pending_receipts_count: number of unprocessed Superstore receipts
+    - nav_pending_receipts_count: number of unprocessed Superstore receipts (admin only)
     """
     ensure_roommates()
     active_roommates = list(Roommate.objects.filter(is_active=True).select_related('user'))
@@ -23,7 +23,7 @@ def splitflow_context(request):
         else:
             current_rm = next((r for r in active_roommates if r.is_me), active_roommates[0] if active_roommates else None)
 
-    pending_count = Receipt.objects.filter(is_archived=False, processed=False).count()
+    pending_count = Receipt.objects.filter(is_archived=False, processed=False).count() if is_admin else 0
 
     return {
         'nav_active_roommates': active_roommates,

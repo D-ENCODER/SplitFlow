@@ -42,6 +42,13 @@
 
       <!-- Action Buttons -->
       <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+        <a href="{% url 'analytics_dashboard' %}"
+           class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/80 shadow-sm transition">
+          <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          <span>Analytics</span>
+        </a>
         <button type="button" onclick="openExpenseModal()"
                 class="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold shadow-sm shadow-emerald-200 dark:shadow-none transition cursor-pointer">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -106,7 +113,29 @@
         </div>
       </div>
 
-      <!-- Quick Superstore Card -->
+      <!-- Living Analytics Card (Visible to all) -->
+      <div class="bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-slate-50 dark:from-indigo-950/40 dark:via-purple-950/20 dark:to-slate-900 rounded-3xl border border-indigo-200/80 dark:border-indigo-900/60 p-5 space-y-3">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-sm">
+            📊
+          </div>
+          <div>
+            <h3 class="font-bold text-sm text-slate-900 dark:text-white">Living Analytics</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Spending Trends &amp; Velocity</p>
+          </div>
+        </div>
+        <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+          Explore category breakdowns, multi-month spending trajectories, and roommate debt balances.
+        </p>
+        <div class="pt-1 flex items-center justify-end text-xs font-semibold">
+          <a href="{% url 'analytics_dashboard' %}" class="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:underline">
+            Open Living Analytics &rarr;
+          </a>
+        </div>
+      </div>
+
+      <!-- Quick Superstore Card (Admin Only) -->
+      {% if is_admin %}
       <div class="bg-gradient-to-br from-indigo-500/10 to-indigo-600/5 dark:from-indigo-950/40 dark:to-slate-900 rounded-3xl border border-indigo-200/80 dark:border-indigo-900/60 p-5 space-y-3">
         <div class="flex items-center gap-2">
           <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs">
@@ -127,6 +156,7 @@
           </a>
         </div>
       </div>
+      {% endif %}
     </div>
 
     <!-- Right Column: Recent Shared Expenses & Settlements Feed (8 cols) -->
@@ -218,7 +248,11 @@
                     {% else %}
                       {{ exp.paid_by.name }} paid ${{ exp.amount }}
                       {% if exp.receipt %}
-                        &bull; <a href="{% url 'batch_summary' %}?ids={{ exp.receipt.id }}" class="text-indigo-600 dark:text-indigo-400 hover:underline">View Receipt Matrix</a>
+                        {% if is_admin %}
+                          &bull; <a href="{% url 'batch_summary' %}?ids={{ exp.receipt.id }}" class="text-indigo-600 dark:text-indigo-400 hover:underline">View Receipt Matrix</a>
+                        {% else %}
+                          &bull; <span class="text-slate-400 dark:text-slate-500">Superstore Bill</span>
+                        {% endif %}
                       {% endif %}
                     {% endif %}
                   </div>

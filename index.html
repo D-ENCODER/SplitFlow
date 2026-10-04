@@ -2,17 +2,48 @@
 <html lang="en" class="h-full antialiased">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SplitFlow — Live Interactive Demo (GitHub Pages)</title>
-  <link rel="icon" type="image/png" href="images/splitflow_logo.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>SplitFlow — Household Ledger &amp; Bill Analytics</title>
   
-  <!-- Inter Font -->
+  <!-- PWA Web App Manifest & Metadata -->
+  <link rel="manifest" href="static/manifest.json">
+  <meta name="theme-color" content="#4f46e5" id="meta-theme-color">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SplitFlow">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="application-name" content="SplitFlow">
+  <meta name="description" content="Household expense tracking, Splitwise debt settlement, and automated Superstore receipt splitting">
+
+  <!-- Icons for iOS, Android, and Desktop -->
+  <link rel="apple-touch-icon" href="static/icons/splitflow_logo.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="static/icons/splitflow_logo.png">
+  <link rel="icon" type="image/svg+xml" href="static/icons/icon.svg">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <!-- Tailwind CSS CDN -->
+  <script>
+    // 1. Determine theme immediately before paint to prevent flash of wrong theme (FOUC)
+    try {
+      var userTheme = localStorage.getItem('theme');
+      var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (userTheme === 'dark' || (!userTheme && systemDark)) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    } catch (e) {
+      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.classList.add('dark');
+      }
+    }
+  </script>
+
+  <!-- Load Tailwind Play CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Configure Tailwind AFTER CDN loads so darkMode: 'class' is registered -->
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -24,604 +55,1756 @@
     };
   </script>
 
-  <!-- Chart.js CDN for Analytics Demo -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
   <style>
-    body { font-family: 'Inter', sans-serif; }
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
+    :root {
+      color-scheme: light;
+      --sat: env(safe-area-inset-top, 0px);
+      --sab: env(safe-area-inset-bottom, 0px);
+    }
+    html {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    html.dark {
+      color-scheme: dark;
+      background-color: #020617 !important;
+      color: #f8fafc !important;
+    }
+    html.dark body {
+      background-color: #020617 !important;
+      color: #f8fafc !important;
+    }
+    html:not(.dark) {
+      color-scheme: light;
+      background-color: #f8fafc !important;
+      color: #0f172a !important;
+    }
+    html:not(.dark) body {
+      background-color: #f8fafc !important;
+      color: #0f172a !important;
+    }
+    body {
+      transition: background-color 0.2s ease, color 0.2s ease;
+      padding-top: var(--sat);
+      padding-bottom: calc(var(--sab) + 4.5rem);
+    }
+    @media (min-width: 640px) {
+      body {
+        padding-bottom: var(--sab);
+      }
+    }
   </style>
 </head>
-<body class="min-h-screen flex flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors">
+<body class="min-h-screen flex flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
 
-  <!-- Demo Notice Banner -->
-  <div class="bg-gradient-to-r from-emerald-600 to-teal-700 text-white text-xs py-2 px-4 text-center font-medium shadow-sm">
-    <span>Live Interactive Demo &bull; Synthetic Demo Dataset (The Maple Residence) &bull; Zero Server Required</span>
-    <a href="https://github.com/D-ENCODER/SplitFlow" class="underline ml-2 font-bold hover:text-emerald-100">View GitHub Repo</a>
+<!-- SplitFlow Interactive Demo Banner -->
+<aside aria-label="Demo Environment Notice" class="bg-gradient-to-r from-emerald-600 to-teal-700 text-white text-xs py-2.5 px-4 shadow-sm flex flex-wrap items-center justify-between gap-3 border-b border-emerald-500/30">
+  <div class="flex items-center gap-2.5 font-medium">
+    <span class="relative flex h-2.5 w-2.5">
+      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75"></span>
+      <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-200"></span>
+    </span>
+    <span><strong>SplitFlow Live Demo</strong> &bull; Production Code &amp; Templates &bull; Synthetic Demo: <em>The Maple Residence</em></span>
   </div>
+  <div class="flex items-center gap-4 text-xs font-semibold">
+    <span class="hidden sm:inline text-emerald-100/90">Zero Personal Data &bull; Fully Interactive</span>
+    <a href="https://github.com/D-ENCODER/SplitFlow" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white px-2.5 py-1 rounded transition border border-white/20">
+      <span>View GitHub Repo</span>
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+    </a>
+  </div>
+</aside>
 
-  <!-- Header Navbar -->
-  <header class="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+
+  <!-- Top Glassmorphic Navbar -->
+  <header class="sticky top-0 z-40 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors duration-200">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4">
       
-      <!-- Brand & Active Group -->
-      <div class="flex items-center gap-3">
-        <a href="#" class="flex items-center gap-2.5">
-          <img src="images/splitflow_logo.png" alt="SplitFlow Logo" class="w-8 h-8 rounded-lg shadow-sm" />
-          <span class="font-bold text-lg tracking-tight text-slate-900 dark:text-white">SplitFlow</span>
+      <!-- Left: Logo & Brand & Active Group Switcher -->
+      <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+        <a href="index.html" class="flex items-center gap-2.5 group shrink-0">
+          <img src="static/icons/splitflow_logo.png" alt="SplitFlow Logo" class="w-9 h-9 rounded-xl object-contain shadow-sm shadow-emerald-500/20 group-hover:scale-105 transition-transform" />
+          <span class="font-bold text-lg tracking-tight text-slate-900 dark:text-white hidden sm:inline-block">SplitFlow</span>
         </a>
 
-        <!-- Group Pill Switcher -->
-        <div class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold">
-          <span>🏠</span>
-          <span id="active-group-name">The Maple Residence</span>
-          <span class="text-[10px] bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-bold px-1.5 py-0.5 rounded">Admin</span>
+        <!-- Group Switcher Dropdown Pill -->
+        
+        <div class="relative" id="group-switcher-container">
+          <button type="button" onclick="toggleGroupMenu()"
+                  class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 transition cursor-pointer"
+                  title="Switch active group">
+            <span>🏠</span>
+            <span class="truncate max-w-[110px] sm:max-w-[150px]">The Maple Residence</span>
+            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          <!-- Group Dropdown Menu -->
+          <div id="group-dropdown" class="hidden absolute left-0 mt-2 w-64 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl py-2 z-50 animate-card-enter">
+            <div class="px-3.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800">
+              Switch Group
+            </div>
+            <div class="py-1 max-h-56 overflow-y-auto">
+              
+              <a href="/groups/2/select/"
+                 class="flex items-center justify-between px-3.5 py-2 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition text-slate-700 dark:text-slate-200">
+                <span class="flex items-center gap-2 truncate">
+                  <span>✈️</span>
+                  <span class="truncate">Banff Weekend Getaway</span>
+                </span>
+                
+              </a>
+              
+              <a href="/groups/1/select/"
+                 class="flex items-center justify-between px-3.5 py-2 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition text-indigo-600 dark:text-indigo-400 bg-indigo-50/60 dark:bg-indigo-950/40">
+                <span class="flex items-center gap-2 truncate">
+                  <span>🏠</span>
+                  <span class="truncate">The Maple Residence</span>
+                </span>
+                
+                  <span class="text-indigo-600 dark:text-indigo-400 text-xs font-bold">✓</span>
+                
+              </a>
+              
+            </div>
+            <div class="border-t border-slate-100 dark:border-slate-800 pt-1 mt-1 space-y-0.5">
+              <a href="groups.html"
+                 class="flex items-center gap-2 px-3.5 py-1.5 text-xs text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-semibold transition">
+                <span>👥</span>
+                <span>Manage All Groups</span>
+              </a>
+              <a href="import_splitwise.html"
+                 class="flex items-center gap-2 px-3.5 py-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-semibold hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition">
+                <span>📥</span>
+                <span>Import from Splitwise</span>
+              </a>
+            </div>
+          </div>
         </div>
+        
       </div>
 
-      <!-- Navigation Tabs -->
-      <nav class="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm font-semibold">
-        <button onclick="switchTab('ledger')" id="tab-btn-ledger" class="px-3 py-1.5 rounded-xl transition bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 font-bold">Ledger</button>
-        <button onclick="switchTab('groups')" id="tab-btn-groups" class="px-3 py-1.5 rounded-xl transition text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60">Groups</button>
-        <button onclick="switchTab('superstore')" id="tab-btn-superstore" class="px-3 py-1.5 rounded-xl transition text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60">Superstore Itemizer</button>
-        <button onclick="switchTab('analytics')" id="tab-btn-analytics" class="px-3 py-1.5 rounded-xl transition text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60">Analytics</button>
+      <!-- Center: Desktop Navigation Tabs -->
+      <nav class="hidden sm:flex items-center gap-1.5 text-sm font-semibold">
+        <!-- Dashboard / Ledger -->
+        <a href="index.html"
+           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60">
+          <svg class="w-4 h-4 shrink-0 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+          </svg>
+          <span>Ledger</span>
+        </a>
+
+        <!-- Groups -->
+        <a href="groups.html"
+           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60">
+          <svg class="w-4 h-4 shrink-0 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+          <span>Groups</span>
+        </a>
+
+        <!-- Analytics -->
+        <a href="analytics.html"
+           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60">
+          <svg class="w-4 h-4 shrink-0 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          <span>Analytics</span>
+        </a>
+
+        
+        <!-- Superstore Grocery Inbox (Admin Only) -->
+        <a href="receipts.html"
+           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60">
+          <svg class="w-4 h-4 shrink-0 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+          <span>Superstore Inbox</span>
+          
+          <span class="w-4 h-4 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center animate-pulse">
+            1
+          </span>
+          
+        </a>
+        
       </nav>
 
-      <!-- Right Actions: Dark Mode & User Profile -->
-      <div class="flex items-center gap-2 sm:gap-3">
-        <button onclick="toggleDarkMode()" class="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition" title="Toggle Dark/Light Mode">
-          <span id="theme-icon">🌙</span>
+      <!-- Right: PWA Install Chip, Dark Mode Toggle & Role-Based Profile Menu -->
+      <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+        
+        <!-- PWA Install Button -->
+        <button id="pwa-install-btn"
+                type="button"
+                onclick="installPWA()"
+                class="hidden items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold shadow-sm shadow-emerald-500/20 hover:brightness-110 transition cursor-pointer">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          <span class="hidden sm:inline">Install App</span>
         </button>
-        <div class="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold">
-          <span class="w-6 h-6 rounded-lg bg-indigo-600 text-white font-bold flex items-center justify-center text-[11px]">A</span>
-          <span class="hidden md:inline">Alex Chen</span>
+
+        <!-- Dark / Light Mode Toggle Switch -->
+        <button id="theme-toggle-btn"
+                type="button"
+                role="switch"
+                onclick="toggleTheme()"
+                aria-checked="false"
+                aria-label="Toggle dark mode"
+                title="Toggle dark mode"
+                class="relative inline-flex h-8 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-slate-300 dark:border-slate-600 bg-slate-200 dark:bg-slate-700 transition-colors duration-200 ease-in-out focus:outline-none">
+          <span class="sr-only">Toggle dark mode</span>
+          <span class="absolute inset-0 flex h-full w-full items-center justify-between px-2 text-xs pointer-events-none select-none">
+            <span class="text-amber-500 flex items-center justify-center">
+              <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/>
+              </svg>
+            </span>
+            <span class="text-indigo-300 flex items-center justify-center">
+              <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/>
+              </svg>
+            </span>
+          </span>
+
+          <span id="theme-toggle-thumb"
+                class="pointer-events-none relative inline-flex h-7 w-7 transform items-center justify-center rounded-full bg-white dark:bg-slate-900 shadow-md ring-0 transition-transform duration-200 ease-in-out text-amber-500 dark:text-indigo-400">
+            <svg id="theme-sun-icon" class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/>
+            </svg>
+            <svg id="theme-moon-icon" class="h-4 w-4" style="display: none;" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/>
+            </svg>
+          </span>
+        </button>
+
+        <!-- User Profile Dropdown or Login Options -->
+        
+        <div class="relative" id="profile-menu-container">
+          <button type="button"
+                  id="profile-menu-btn"
+                  onclick="toggleProfileMenu()"
+                  class="flex items-center gap-2 p-1 pr-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer">
+            <span class="w-7 h-7 rounded-xl bg-gradient-to-tr from-amber-600 to-orange-500 text-white font-bold text-xs flex items-center justify-center">
+              A
+            </span>
+            <div class="flex items-center gap-1.5 text-left hidden sm:flex">
+              <span class="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[90px]">
+                Alex Chen
+              </span>
+              
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300">Admin</span>
+              
+            </div>
+            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          <!-- Dropdown Popover -->
+          <div id="profile-dropdown"
+               class="hidden absolute right-0 mt-2 w-60 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl py-2 z-50 animate-card-enter">
+            <!-- User Header -->
+            <div class="px-4 py-2.5 border-b border-slate-100 dark:border-slate-800">
+              <div class="font-bold text-xs text-slate-900 dark:text-white truncate">
+                Alex Chen
+              </div>
+              <div class="text-[11px] text-slate-400 truncate">@alex</div>
+              <div class="mt-1">
+                
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                    👑 Administrator
+                  </span>
+                
+              </div>
+            </div>
+
+            <!-- Links -->
+            <div class="py-1">
+              <a href="#"
+                 class="flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 hover:text-indigo-600 dark:hover:text-indigo-300 transition">
+                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <span>My Profile &amp; Settings</span>
+              </a>
+
+              
+              <a href="/admin/" target="_blank"
+                 class="flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-amber-50 dark:hover:bg-amber-950/60 hover:text-amber-600 dark:hover:text-amber-300 transition">
+                <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span>Django Admin &rarr;</span>
+              </a>
+              
+            </div>
+
+            <!-- Logout -->
+            <div class="border-t border-slate-100 dark:border-slate-800 pt-1 mt-1">
+              <a href="#"
+                 class="flex items-center gap-2.5 px-4 py-2 text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                <span>Log out</span>
+              </a>
+            </div>
+          </div>
         </div>
+        
+
       </div>
     </div>
   </header>
 
-  <!-- Main Content -->
+  <!-- Flash Messages -->
+  
+
+  <!-- Main Content Container -->
   <main class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
-
-    <!-- ========================================== -->
-    <!-- TAB 1: LEDGER / DASHBOARD -->
-    <!-- ========================================== -->
-    <div id="tab-ledger" class="tab-content active space-y-6">
-      
-      <!-- Balance Cards Grid -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <!-- Net Balance -->
-        <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Total Net Balance</div>
-          <div id="card-total-net" class="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400">+$145.20</div>
-          <div class="text-xs text-slate-500 dark:text-slate-400 mt-1">You are owed overall across household</div>
-        </div>
-
-        <!-- You are Owed -->
-        <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">You are Owed</div>
-          <div id="card-owed-to-me" class="text-3xl font-extrabold text-slate-900 dark:text-white">$210.50</div>
-          <div class="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mt-1">From Sarah and Elena</div>
-        </div>
-
-        <!-- You Owe -->
-        <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">You Owe</div>
-          <div id="card-i-owe" class="text-3xl font-extrabold text-slate-900 dark:text-white">$65.30</div>
-          <div class="text-xs text-rose-500 font-semibold mt-1">To Marcus</div>
-        </div>
-      </div>
-
-      <!-- Action Bar & Friend Balance Summary -->
-      <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div class="space-y-1">
-          <div class="text-sm font-bold text-slate-800 dark:text-slate-200">Roommate Balances</div>
-          <div class="flex flex-wrap gap-2 pt-1" id="friend-balance-pills">
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-              Sarah owes you <strong>$120.00</strong>
-            </span>
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-              Elena owes you <strong>$90.50</strong>
-            </span>
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
-              You owe Marcus <strong>$65.30</strong>
-            </span>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-2 w-full md:w-auto">
-          <button onclick="openModal('modal-add-expense')" class="flex-1 md:flex-none px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition">+ Add Expense</button>
-          <button onclick="openModal('modal-settle-up')" class="flex-1 md:flex-none px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition">Settle Up</button>
-        </div>
-      </div>
-
-      <!-- Expense Stream -->
-      <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-        <div class="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-          <span class="text-sm font-bold text-slate-800 dark:text-slate-200">Recent Household Transactions</span>
-          <span class="text-xs text-slate-400">Locked to Today's Server Date</span>
-        </div>
-        <div class="divide-y divide-slate-100 dark:divide-slate-800" id="expense-list">
-          <!-- Dynamically Rendered by JS -->
-        </div>
-      </div>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- TAB 2: GROUPS -->
-    <!-- ========================================== -->
-    <div id="tab-groups" class="tab-content space-y-6">
-      <div class="flex items-center justify-between">
-        <div>
-          <h2 class="text-lg font-bold text-slate-900 dark:text-white">Household Groups</h2>
-          <p class="text-xs text-slate-500 dark:text-slate-400">Multi-tenant group scoping with Group Admin role-based access control.</p>
-        </div>
-        <button onclick="alert('In this interactive client-side demo, you are viewing sample group data. Deploy full backend to create unlimited live households.')" class="px-3.5 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-bold shadow-sm">+ Create Group</button>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <!-- Group 1 -->
-        <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border-2 border-indigo-500/50 shadow-sm relative">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-bold px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">Active Group</span>
-            <span class="text-xs font-bold px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300">Admin: Alex Chen</span>
-          </div>
-          <h3 class="text-base font-bold text-slate-900 dark:text-white">The Maple Residence</h3>
-          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Primary apartment household with 4 active roommates.</p>
-          <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            <div class="flex -space-x-1.5">
-              <span class="w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-bold flex items-center justify-center">A</span>
-              <span class="w-6 h-6 rounded-full bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center">S</span>
-              <span class="w-6 h-6 rounded-full bg-amber-600 text-white text-[10px] font-bold flex items-center justify-center">M</span>
-              <span class="w-6 h-6 rounded-full bg-purple-600 text-white text-[10px] font-bold flex items-center justify-center">E</span>
-            </div>
-            <button onclick="alert('Group Admin privilege verified: You have permission to manage this household.')" class="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">Manage Group &amp; Members &rarr;</button>
-          </div>
-        </div>
-
-        <!-- Group 2 -->
-        <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">Trip</span>
-            <span class="text-xs font-semibold text-slate-400">Admin: Marcus Vance</span>
-          </div>
-          <h3 class="text-base font-bold text-slate-900 dark:text-white">Banff Weekend Getaway</h3>
-          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Cabin rental, ski passes, and shared roadtrip gas.</p>
-          <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            <span class="text-xs text-slate-400">3 participants</span>
-            <button onclick="alert('Switching groups in the full backend persists active group in session.')" class="text-xs font-semibold text-slate-600 dark:text-slate-300 hover:underline">Switch to Group</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- TAB 3: SUPERSTORE ITEMIZER -->
-    <!-- ========================================== -->
-    <div id="tab-superstore" class="tab-content space-y-6">
-      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-        <div>
-          <h2 class="text-lg font-bold text-slate-900 dark:text-white">Real Canadian Superstore Order Itemizer</h2>
-          <p class="text-xs text-slate-500 dark:text-slate-400">Automated DOM parsing with penny-perfect bottle deposit &amp; tax reconciliation.</p>
-        </div>
-        <div class="px-3 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-bold">
-          Order #RCS-84920412 &bull; Total: $84.95
-        </div>
-      </div>
-
-      <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-x-auto">
-        <table class="w-full text-left text-xs">
-          <thead>
-            <tr class="border-b border-slate-200 dark:border-slate-800 text-slate-400 font-bold uppercase tracking-wider">
-              <th class="py-2.5">Item Description</th>
-              <th class="py-2.5">Qty</th>
-              <th class="py-2.5">Price</th>
-              <th class="py-2.5">Allocated Roommates</th>
-              <th class="py-2.5 text-right">Cost Per Person</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-100 dark:divide-slate-800" id="superstore-items-table">
-            <!-- Dynamically populated -->
-          </tbody>
-        </table>
-
-        <!-- Receipt Reconciliation Math Summary -->
-        <div class="mt-6 pt-4 border-t border-slate-200 dark:border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-          <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-            <div class="text-[11px] text-slate-400">Grocery Items</div>
-            <div class="text-base font-bold text-slate-900 dark:text-white">$81.35</div>
-          </div>
-          <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-            <div class="text-[11px] text-slate-400">Bottle Deposits &amp; Fees</div>
-            <div class="text-base font-bold text-amber-600 dark:text-amber-400">$1.45</div>
-          </div>
-          <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-            <div class="text-[11px] text-slate-400">Taxes (GST/PST)</div>
-            <div class="text-base font-bold text-slate-900 dark:text-white">$2.15</div>
-          </div>
-          <div class="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800">
-            <div class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold">Total Reconciled</div>
-            <div class="text-base font-extrabold text-emerald-700 dark:text-emerald-300">$84.95</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- TAB 4: ANALYTICS -->
-    <!-- ========================================== -->
-    <div id="tab-analytics" class="tab-content space-y-6">
+    
+<div class="space-y-6">
+  <!-- Top Splitwise Hero Bar -->
+  <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-5 sm:p-7">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-5">
       <div>
-        <h2 class="text-lg font-bold text-slate-900 dark:text-white">Household Financial Analytics</h2>
-        <p class="text-xs text-slate-500 dark:text-slate-400">Spending breakdown by category and historical monthly trendlines.</p>
+        <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+          <a href="groups.html" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/70 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800 transition shadow-sm" title="Switch Household Group">
+            <span class="text-sm">🏠</span>
+            <span>The Maple Residence</span>
+            <span class="text-[10px] text-indigo-400">▾</span>
+          </a>
+          <span class="text-xs text-slate-400">
+            
+              Viewing Household Ledger &bull; <strong class="text-amber-600 dark:text-amber-400">👑 Administrator Mode</strong>
+            
+          </span>
+        </div>
+        
+        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+          
+            <span class="text-emerald-600 dark:text-emerald-400">You are owed $84.99</span> overall
+          
+        </h1>
+        
+        <div class="flex flex-wrap items-center gap-4 mt-2 text-xs font-medium">
+          <div class="text-slate-500 dark:text-slate-400">
+            Total you owe: <span class="font-bold text-slate-700 dark:text-slate-200">$0.00</span>
+          </div>
+          <span class="text-slate-300 dark:text-slate-700">&bull;</span>
+          <div class="text-slate-500 dark:text-slate-400">
+            Total owed to you: <span class="font-bold text-slate-700 dark:text-slate-200">$84.99</span>
+          </div>
+        </div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- Monthly Chart -->
-        <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
-          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Monthly Expenditure (CAD)</h3>
-          <canvas id="monthlyChart" height="200"></canvas>
-        </div>
-
-        <!-- Category Doughnut -->
-        <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
-          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Expense Breakdown by Category</h3>
-          <canvas id="categoryChart" height="200"></canvas>
-        </div>
+      <!-- Action Buttons -->
+      <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+        <a href="import_splitwise.html"
+           class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/80 shadow-sm transition">
+          <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+          </svg>
+          <span>Import Splitwise</span>
+        </a>
+        <a href="analytics.html"
+           class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/80 shadow-sm transition">
+          <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          <span>Analytics</span>
+        </a>
+        <button type="button" onclick="openExpenseModal()"
+                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold shadow-sm shadow-emerald-200 dark:shadow-none transition cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          Add an Expense
+        </button>
+        <button type="button" onclick="openSettleModal()"
+                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold shadow-sm shadow-indigo-200 dark:shadow-none transition cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+          Settle Up
+        </button>
       </div>
     </div>
+  </div>
 
-    <!-- Sample Data Downloads & Documentation Hub -->
-    <div class="mt-12 p-6 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 space-y-3">
-      <div class="font-bold text-slate-800 dark:text-slate-200 text-sm">Synthetic Demo Datasets &amp; Documentation</div>
-      <p>Download sample fixtures to test your own local instance or import historical Splitwise ledgers:</p>
-      <div class="flex flex-wrap gap-2.5">
-        <a href="demo/demo_splitwise_export.csv" download class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-semibold hover:text-indigo-600 transition">
-          <span>Download Sample Splitwise CSV</span>
-        </a>
-        <a href="demo/demo_superstore_receipt.html" download class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-semibold hover:text-indigo-600 transition">
-          <span>Download Sample Superstore Receipt HTML</span>
-        </a>
-        <a href="https://github.com/D-ENCODER/SplitFlow" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition">
-          <span>Explore GitHub Repository &rarr;</span>
-        </a>
+  <!-- 2-Column Splitwise Grid -->
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+    <!-- Left Column: Friends & Roommate Balances (4 cols) -->
+    <div class="lg:col-span-4 space-y-4">
+      <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-5">
+        <h2 class="text-base font-bold text-slate-900 dark:text-white mb-4 flex items-center justify-between">
+          <span>Roommate Balances</span>
+          <span class="text-xs font-normal text-slate-400">Your Standing</span>
+        </h2>
+
+        <div class="space-y-3">
+          
+          <div class="p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold flex items-center justify-center text-sm shrink-0 border border-indigo-200 dark:border-indigo-800">
+                S
+              </div>
+              <div class="min-w-0">
+                <div class="font-semibold text-sm text-slate-900 dark:text-white truncate">
+                  Sarah Jenkins
+                  
+                </div>
+                <div class="text-xs">
+                  
+                    <span class="text-emerald-600 dark:text-emerald-400 font-semibold">owes you $21.38</span>
+                  
+                </div>
+              </div>
+            </div>
+
+            
+              <button type="button"
+                      onclick="settleWith('1', '2', '21.38', 'owes_you')"
+                      class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 transition shrink-0 cursor-pointer">
+                Settle
+              </button>
+            
+          </div>
+          
+          <div class="p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold flex items-center justify-center text-sm shrink-0 border border-indigo-200 dark:border-indigo-800">
+                M
+              </div>
+              <div class="min-w-0">
+                <div class="font-semibold text-sm text-slate-900 dark:text-white truncate">
+                  Marcus Vance
+                  
+                </div>
+                <div class="text-xs">
+                  
+                    <span class="text-emerald-600 dark:text-emerald-400 font-semibold">owes you $12.18</span>
+                  
+                </div>
+              </div>
+            </div>
+
+            
+              <button type="button"
+                      onclick="settleWith('1', '3', '12.18', 'owes_you')"
+                      class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 transition shrink-0 cursor-pointer">
+                Settle
+              </button>
+            
+          </div>
+          
+          <div class="p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold flex items-center justify-center text-sm shrink-0 border border-indigo-200 dark:border-indigo-800">
+                E
+              </div>
+              <div class="min-w-0">
+                <div class="font-semibold text-sm text-slate-900 dark:text-white truncate">
+                  Elena Rostova
+                  
+                </div>
+                <div class="text-xs">
+                  
+                    <span class="text-emerald-600 dark:text-emerald-400 font-semibold">owes you $51.43</span>
+                  
+                </div>
+              </div>
+            </div>
+
+            
+              <button type="button"
+                      onclick="settleWith('1', '4', '51.43', 'owes_you')"
+                      class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 transition shrink-0 cursor-pointer">
+                Settle
+              </button>
+            
+          </div>
+          
+        </div>
+      </div>
+
+      <!-- Living Analytics Card (Visible to all) -->
+      <div class="bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-slate-50 dark:from-indigo-950/40 dark:via-purple-950/20 dark:to-slate-900 rounded-3xl border border-indigo-200/80 dark:border-indigo-900/60 p-5 space-y-3">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-sm">
+            📊
+          </div>
+          <div>
+            <h3 class="font-bold text-sm text-slate-900 dark:text-white">Living Analytics</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Spending Trends &amp; Velocity</p>
+          </div>
+        </div>
+        <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+          Explore category breakdowns, multi-month spending trajectories, and roommate debt balances.
+        </p>
+        <div class="pt-1 flex items-center justify-end text-xs font-semibold">
+          <a href="analytics.html" class="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:underline">
+            Open Living Analytics &rarr;
+          </a>
+        </div>
+      </div>
+
+      <!-- Quick Superstore Card (Admin Only) -->
+      
+      <div class="bg-gradient-to-br from-indigo-500/10 to-indigo-600/5 dark:from-indigo-950/40 dark:to-slate-900 rounded-3xl border border-indigo-200/80 dark:border-indigo-900/60 p-5 space-y-3">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs">
+            RC
+          </div>
+          <div>
+            <h3 class="font-bold text-sm text-slate-900 dark:text-white">Real Canadian Superstore</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Automated Receipt Parser</p>
+          </div>
+        </div>
+        <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+          Drop your Superstore orders into the inbox. All items and equal taxes are parsed and synced directly into this Splitwise ledger!
+        </p>
+        <div class="pt-1 flex items-center justify-between text-xs font-semibold">
+          <span class="text-slate-500 dark:text-slate-400">2 receipts on disk</span>
+          <a href="receipts.html" class="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:underline">
+            Open Superstore Inbox &rarr;
+          </a>
+        </div>
+      </div>
+      
+    </div>
+
+    <!-- Right Column: Recent Shared Expenses & Settlements Feed (8 cols) -->
+    <div class="lg:col-span-8 space-y-4">
+      <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-5 sm:p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 class="text-lg font-bold text-slate-900 dark:text-white">Shared Expenses &amp; Activity</h2>
+            <p class="text-xs text-slate-400 mt-0.5">Chronological ledger of grocery splits, utility bills, and settlements</p>
+          </div>
+          <div class="flex items-center gap-1.5 text-xs font-semibold">
+            <span class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+              8 records
+            </span>
+          </div>
+        </div>
+
+        <!-- Search & Category Filters Bar -->
+        <div class="mb-4 space-y-2.5">
+          <form method="get" action="/" class="flex items-center gap-2">
+            <div class="relative flex-1">
+              <input type="text" name="q" value="" placeholder="Search description, notes, or roommate..."
+                     class="w-full pl-9 pr-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <svg class="w-4 h-4 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+              </svg>
+            </div>
+            
+            <button type="submit" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition cursor-pointer">
+              Search
+            </button>
+            
+          </form>
+
+          <!-- Category filter pills -->
+          <div class="flex flex-wrap items-center gap-1.5 text-xs">
+            <a href="?"
+               class="px-2.5 py-1 rounded-lg font-semibold transition bg-indigo-600 text-white shadow-sm">
+              All
+            </a>
+            ]
+            <a href="?category=General"
+               class="px-2.5 py-1 rounded-lg font-semibold transition bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+              General
+            </a>
+            ]
+            <a href="?category=Groceries"
+               class="px-2.5 py-1 rounded-lg font-semibold transition bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+              Groceries
+            </a>
+            ]
+            <a href="?category=Utilities"
+               class="px-2.5 py-1 rounded-lg font-semibold transition bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+              Utilities
+            </a>
+            ]
+            <a href="?category=Rent"
+               class="px-2.5 py-1 rounded-lg font-semibold transition bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+              Rent
+            </a>
+            ]
+            <a href="?category=Dining"
+               class="px-2.5 py-1 rounded-lg font-semibold transition bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+              Dining Out
+            </a>
+            ]
+            <a href="?category=Entertainment"
+               class="px-2.5 py-1 rounded-lg font-semibold transition bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+              Entertainment
+            </a>
+            ]
+            <a href="?category=Household"
+               class="px-2.5 py-1 rounded-lg font-semibold transition bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+              Household Supplies
+            </a>
+            ]
+            <a href="?category=Transportation"
+               class="px-2.5 py-1 rounded-lg font-semibold transition bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+              Transportation
+            </a>
+            ]
+            <a href="?category=Furniture"
+               class="px-2.5 py-1 rounded-lg font-semibold transition bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+              Furniture
+            </a>
+            ]
+            <a href="?category=Gifts"
+               class="px-2.5 py-1 rounded-lg font-semibold transition bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+              Gifts
+            </a>
+            ]
+            <a href="?category=Payment"
+               class="px-2.5 py-1 rounded-lg font-semibold transition bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+              Payment
+            </a>
+            
+          </div>
+        </div>
+
+        
+        <div class="divide-y divide-slate-100 dark:divide-slate-800/80">
+          
+          
+          <div class="py-3.5 group hover:bg-slate-50/60 dark:hover:bg-slate-800/40 rounded-2xl px-2 transition">
+            <div class="flex items-center justify-between gap-4">
+              <!-- Left info: date + icon + title -->
+              <div class="flex items-center gap-3.5 min-w-0 flex-1">
+                <!-- Date badge -->
+                <div class="text-center w-11 shrink-0">
+                  <div class="text-[10px] font-bold uppercase text-slate-400">Oct</div>
+                  <div class="text-base font-extrabold text-slate-800 dark:text-slate-200 leading-none">04</div>
+                </div>
+
+                <!-- Category Icon -->
+                <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-lg shrink-0 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600">
+                  🛒
+                  
+                </div>
+
+                <!-- Description & payer -->
+                <div class="min-w-0 flex-1">
+                  <div class="font-bold text-sm text-slate-900 dark:text-white truncate">
+                    Superstore: September 28, 2026 at 2:15 PM
+                  </div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    
+                      Alex Chen paid $26.06
+                      
+                        
+                          &bull; <a href="batch_summary.html" class="text-indigo-600 dark:text-indigo-400 hover:underline">View Receipt Matrix</a>
+                        
+                      
+                    
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right: Viewer impact + Delete (Guarded) -->
+              <div class="text-right shrink-0 flex items-center gap-3">
+                <div>
+                  <div class="text-xs uppercase font-semibold text-slate-400">
+                    you lent
+                    
+                  </div>
+                  <div class="font-mono text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                    +$26
+                    
+                  </div>
+                </div>
+
+                <!-- Delete button (Only for payer or admin) -->
+                
+                <a href="/expenses/8/delete/"
+                   onclick="return confirm('Delete Superstore: September 28, 2026 at 2:15 PM?');"
+                   class="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition"
+                   title="Delete expense">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </a>
+                
+              </div>
+            </div>
+
+            <!-- Expandable Itemized Splits Pill Bar -->
+            
+            <div class="mt-2 pl-14 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+              <span class="font-medium text-slate-400">Splits:</span>
+              
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                Alex Chen: $6.50
+              </span>
+              
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                Sarah Jenkins: $6.52
+              </span>
+              
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                Marcus Vance: $6.52
+              </span>
+              
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                Elena Rostova: $6.52
+              </span>
+              
+            </div>
+            
+          </div>
+          
+          
+          
+          <div class="py-3.5 group hover:bg-slate-50/60 dark:hover:bg-slate-800/40 rounded-2xl px-2 transition">
+            <div class="flex items-center justify-between gap-4">
+              <!-- Left info: date + icon + title -->
+              <div class="flex items-center gap-3.5 min-w-0 flex-1">
+                <!-- Date badge -->
+                <div class="text-center w-11 shrink-0">
+                  <div class="text-[10px] font-bold uppercase text-slate-400">Oct</div>
+                  <div class="text-base font-extrabold text-slate-800 dark:text-slate-200 leading-none">04</div>
+                </div>
+
+                <!-- Category Icon -->
+                <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-lg shrink-0 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600">
+                  💵
+                  
+                </div>
+
+                <!-- Description & payer -->
+                <div class="min-w-0 flex-1">
+                  <div class="font-bold text-sm text-slate-900 dark:text-white truncate">
+                    Settle Up: Elena to Marcus
+                  </div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    
+                      Elena Rostova paid Marcus Vance $42.50
+                    
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right: Viewer impact + Delete (Guarded) -->
+              <div class="text-right shrink-0 flex items-center gap-3">
+                <div>
+                  <div class="text-xs uppercase font-semibold text-slate-400">
+                    your share
+                  </div>
+                  <div class="font-mono text-sm font-bold text-slate-500">
+                    $0.00
+                  </div>
+                </div>
+
+                <!-- Delete button (Only for payer or admin) -->
+                
+                <a href="/expenses/7/delete/"
+                   onclick="return confirm('Delete Settle Up: Elena to Marcus?');"
+                   class="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition"
+                   title="Delete expense">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </a>
+                
+              </div>
+            </div>
+
+            <!-- Expandable Itemized Splits Pill Bar -->
+            
+          </div>
+          
+          
+          
+          <div class="py-3.5 group hover:bg-slate-50/60 dark:hover:bg-slate-800/40 rounded-2xl px-2 transition">
+            <div class="flex items-center justify-between gap-4">
+              <!-- Left info: date + icon + title -->
+              <div class="flex items-center gap-3.5 min-w-0 flex-1">
+                <!-- Date badge -->
+                <div class="text-center w-11 shrink-0">
+                  <div class="text-[10px] font-bold uppercase text-slate-400">Oct</div>
+                  <div class="text-base font-extrabold text-slate-800 dark:text-slate-200 leading-none">04</div>
+                </div>
+
+                <!-- Category Icon -->
+                <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-lg shrink-0 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                  📝
+                </div>
+
+                <!-- Description & payer -->
+                <div class="min-w-0 flex-1">
+                  <div class="font-bold text-sm text-slate-900 dark:text-white truncate">
+                    Living Room Modern Floor Lamp
+                  </div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    
+                      Marcus Vance paid $68.00
+                      
+                    
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right: Viewer impact + Delete (Guarded) -->
+              <div class="text-right shrink-0 flex items-center gap-3">
+                <div>
+                  <div class="text-xs uppercase font-semibold text-slate-400">
+                    you owe
+                    
+                  </div>
+                  <div class="font-mono text-sm font-bold text-amber-600 dark:text-amber-400">
+                    -$17.00
+                    
+                  </div>
+                </div>
+
+                <!-- Delete button (Only for payer or admin) -->
+                
+                <a href="/expenses/6/delete/"
+                   onclick="return confirm('Delete Living Room Modern Floor Lamp?');"
+                   class="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition"
+                   title="Delete expense">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </a>
+                
+              </div>
+            </div>
+
+            <!-- Expandable Itemized Splits Pill Bar -->
+            
+            <div class="mt-2 pl-14 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+              <span class="font-medium text-slate-400">Splits:</span>
+              
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                Alex Chen: $17.00
+              </span>
+              
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                Sarah Jenkins: $17.00
+              </span>
+              
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                Marcus Vance: $17.00
+              </span>
+              
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                Elena Rostova: $17.00
+              </span>
+              
+            </div>
+            
+          </div>
+          
+          
+          
+          <div class="py-3.5 group hover:bg-slate-50/60 dark:hover:bg-slate-800/40 rounded-2xl px-2 transition">
+            <div class="flex items-center justify-between gap-4">
+              <!-- Left info: date + icon + title -->
+              <div class="flex items-center gap-3.5 min-w-0 flex-1">
+                <!-- Date badge -->
+                <div class="text-center w-11 shrink-0">
+                  <div class="text-[10px] font-bold uppercase text-slate-400">Oct</div>
+                  <div class="text-base font-extrabold text-slate-800 dark:text-slate-200 leading-none">04</div>
+                </div>
+
+                <!-- Category Icon -->
+                <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-lg shrink-0 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600">
+                  🛒
+                  
+                </div>
+
+                <!-- Description & payer -->
+                <div class="min-w-0 flex-1">
+                  <div class="font-bold text-sm text-slate-900 dark:text-white truncate">
+                    Cold-Pressed Olive Oil &amp; Spices
+                  </div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    
+                      Alex Chen paid $34.20
+                      
+                    
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right: Viewer impact + Delete (Guarded) -->
+              <div class="text-right shrink-0 flex items-center gap-3">
+                <div>
+                  <div class="text-xs uppercase font-semibold text-slate-400">
+                    you lent
+                    
+                  </div>
+                  <div class="font-mono text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                    +$34
+                    
+                  </div>
+                </div>
+
+                <!-- Delete button (Only for payer or admin) -->
+                
+                <a href="/expenses/5/delete/"
+                   onclick="return confirm('Delete Cold-Pressed Olive Oil &amp; Spices?');"
+                   class="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition"
+                   title="Delete expense">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </a>
+                
+              </div>
+            </div>
+
+            <!-- Expandable Itemized Splits Pill Bar -->
+            
+            <div class="mt-2 pl-14 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+              <span class="font-medium text-slate-400">Splits:</span>
+              
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                Alex Chen: $17.10
+              </span>
+              
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                Sarah Jenkins: $17.10
+              </span>
+              
+            </div>
+            
+          </div>
+          
+          
+          
+          <div class="py-3.5 group hover:bg-slate-50/60 dark:hover:bg-slate-800/40 rounded-2xl px-2 transition">
+            <div class="flex items-center justify-between gap-4">
+              <!-- Left info: date + icon + title -->
+              <div class="flex items-center gap-3.5 min-w-0 flex-1">
+                <!-- Date badge -->
+                <div class="text-center w-11 shrink-0">
+                  <div class="text-[10px] font-bold uppercase text-slate-400">Oct</div>
+                  <div class="text-base font-extrabold text-slate-800 dark:text-slate-200 leading-none">04</div>
+                </div>
+
+                <!-- Category Icon -->
+                <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-lg shrink-0 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                  📝
+                </div>
+
+                <!-- Description & payer -->
+                <div class="min-w-0 flex-1">
+                  <div class="font-bold text-sm text-slate-900 dark:text-white truncate">
+                    Eco Paper Towels &amp; Cleaning Detergent
+                  </div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    
+                      Elena Rostova paid $28.75
+                      
+                    
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right: Viewer impact + Delete (Guarded) -->
+              <div class="text-right shrink-0 flex items-center gap-3">
+                <div>
+                  <div class="text-xs uppercase font-semibold text-slate-400">
+                    you owe
+                    
+                  </div>
+                  <div class="font-mono text-sm font-bold text-amber-600 dark:text-amber-400">
+                    -$7.18
+                    
+                  </div>
+                </div>
+
+                <!-- Delete button (Only for payer or admin) -->
+                
+                <a href="/expenses/4/delete/"
+                   onclick="return confirm('Delete Eco Paper Towels &amp; Cleaning Detergent?');"
+                   class="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition"
+                   title="Delete expense">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </a>
+                
+              </div>
+            </div>
+
+            <!-- Expandable Itemized Splits Pill Bar -->
+            
+            <div class="mt-2 pl-14 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+              <span class="font-medium text-slate-400">Splits:</span>
+              
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                Alex Chen: $7.18
+              </span>
+              
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                Sarah Jenkins: $7.19
+              </span>
+              
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                Marcus Vance: $7.19
+              </span>
+              
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                Elena Rostova: $7.19
+              </span>
+              
+            </div>
+            
+          </div>
+          
+          
+          
+          <div class="py-3.5 group hover:bg-slate-50/60 dark:hover:bg-slate-800/40 rounded-2xl px-2 transition">
+            <div class="flex items-center justify-between gap-4">
+              <!-- Left info: date + icon + title -->
+              <div class="flex items-center gap-3.5 min-w-0 flex-1">
+                <!-- Date badge -->
+                <div class="text-center w-11 shrink-0">
+                  <div class="text-[10px] font-bold uppercase text-slate-400">Oct</div>
+                  <div class="text-base font-extrabold text-slate-800 dark:text-slate-200 leading-none">04</div>
+                </div>
+
+                <!-- Category Icon -->
+                <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-lg shrink-0 bg-amber-50 dark:bg-amber-950/60 text-amber-600">
+                  💡
+                  
+                </div>
+
+                <!-- Description & payer -->
+                <div class="min-w-0 flex-1">
+                  <div class="font-bold text-sm text-slate-900 dark:text-white truncate">
+                    Hydro &amp; Electricity Bill
+                  </div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    
+                      Sarah Jenkins paid $118.40
+                      
+                    
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right: Viewer impact + Delete (Guarded) -->
+              <div class="text-right shrink-0 flex items-center gap-3">
+                <div>
+                  <div class="text-xs uppercase font-semibold text-slate-400">
+                    you owe
+                    
+                  </div>
+                  <div class="font-mono text-sm font-bold text-amber-600 dark:text-amber-400">
+                    -$29.60
+                    
+                  </div>
+                </div>
+
+                <!-- Delete button (Only for payer or admin) -->
+                
+                <a href="/expenses/3/delete/"
+                   onclick="return confirm('Delete Hydro &amp; Electricity Bill?');"
+                   class="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition"
+                   title="Delete expense">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </a>
+                
+              </div>
+            </div>
+
+            <!-- Expandable Itemized Splits Pill Bar -->
+            
+            <div class="mt-2 pl-14 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+              <span class="font-medium text-slate-400">Splits:</span>
+              
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                Alex Chen: $29.60
+              </span>
+              
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                Sarah Jenkins: $29.60
+              </span>
+              
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                Marcus Vance: $29.60
+              </span>
+              
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                Elena Rostova: $29.60
+              </span>
+              
+            </div>
+            
+          </div>
+          
+          
+          
+          <div class="py-3.5 group hover:bg-slate-50/60 dark:hover:bg-slate-800/40 rounded-2xl px-2 transition">
+            <div class="flex items-center justify-between gap-4">
+              <!-- Left info: date + icon + title -->
+              <div class="flex items-center gap-3.5 min-w-0 flex-1">
+                <!-- Date badge -->
+                <div class="text-center w-11 shrink-0">
+                  <div class="text-[10px] font-bold uppercase text-slate-400">Oct</div>
+                  <div class="text-base font-extrabold text-slate-800 dark:text-slate-200 leading-none">04</div>
+                </div>
+
+                <!-- Category Icon -->
+                <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-lg shrink-0 bg-amber-50 dark:bg-amber-950/60 text-amber-600">
+                  💡
+                  
+                </div>
+
+                <!-- Description & payer -->
+                <div class="min-w-0 flex-1">
+                  <div class="font-bold text-sm text-slate-900 dark:text-white truncate">
+                    Fiber Gigabit Internet
+                  </div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    
+                      Marcus Vance paid $85.00
+                      
+                    
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right: Viewer impact + Delete (Guarded) -->
+              <div class="text-right shrink-0 flex items-center gap-3">
+                <div>
+                  <div class="text-xs uppercase font-semibold text-slate-400">
+                    you owe
+                    
+                  </div>
+                  <div class="font-mono text-sm font-bold text-amber-600 dark:text-amber-400">
+                    -$21.25
+                    
+                  </div>
+                </div>
+
+                <!-- Delete button (Only for payer or admin) -->
+                
+                <a href="/expenses/2/delete/"
+                   onclick="return confirm('Delete Fiber Gigabit Internet?');"
+                   class="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition"
+                   title="Delete expense">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </a>
+                
+              </div>
+            </div>
+
+            <!-- Expandable Itemized Splits Pill Bar -->
+            
+            <div class="mt-2 pl-14 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+              <span class="font-medium text-slate-400">Splits:</span>
+              
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                Alex Chen: $21.25
+              </span>
+              
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                Sarah Jenkins: $21.25
+              </span>
+              
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                Marcus Vance: $21.25
+              </span>
+              
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                Elena Rostova: $21.25
+              </span>
+              
+            </div>
+            
+          </div>
+          
+          
+          
+          <div class="py-3.5 group hover:bg-slate-50/60 dark:hover:bg-slate-800/40 rounded-2xl px-2 transition">
+            <div class="flex items-center justify-between gap-4">
+              <!-- Left info: date + icon + title -->
+              <div class="flex items-center gap-3.5 min-w-0 flex-1">
+                <!-- Date badge -->
+                <div class="text-center w-11 shrink-0">
+                  <div class="text-[10px] font-bold uppercase text-slate-400">Oct</div>
+                  <div class="text-base font-extrabold text-slate-800 dark:text-slate-200 leading-none">04</div>
+                </div>
+
+                <!-- Category Icon -->
+                <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-lg shrink-0 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600">
+                  🛒
+                  
+                </div>
+
+                <!-- Description & payer -->
+                <div class="min-w-0 flex-1">
+                  <div class="font-bold text-sm text-slate-900 dark:text-white truncate">
+                    Weekly Groceries (Superstore)
+                  </div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    
+                      Alex Chen paid $164.50
+                      
+                    
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right: Viewer impact + Delete (Guarded) -->
+              <div class="text-right shrink-0 flex items-center gap-3">
+                <div>
+                  <div class="text-xs uppercase font-semibold text-slate-400">
+                    you lent
+                    
+                  </div>
+                  <div class="font-mono text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                    +$164
+                    
+                  </div>
+                </div>
+
+                <!-- Delete button (Only for payer or admin) -->
+                
+                <a href="/expenses/1/delete/"
+                   onclick="return confirm('Delete Weekly Groceries (Superstore)?');"
+                   class="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition"
+                   title="Delete expense">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </a>
+                
+              </div>
+            </div>
+
+            <!-- Expandable Itemized Splits Pill Bar -->
+            
+            <div class="mt-2 pl-14 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+              <span class="font-medium text-slate-400">Splits:</span>
+              
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                Alex Chen: $41.14
+              </span>
+              
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                Sarah Jenkins: $41.12
+              </span>
+              
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                Marcus Vance: $41.12
+              </span>
+              
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                Elena Rostova: $41.12
+              </span>
+              
+            </div>
+            
+          </div>
+          
+          
+        </div>
+
+        
+        
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL: ADD AN EXPENSE -->
+<!-- ======================================================== -->
+<div id="expense-modal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+  <div class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 sm:p-7 space-y-5 animate-card-enter">
+    <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+      <div>
+        <h3 class="text-lg font-bold text-slate-900 dark:text-white">Add a Shared Expense</h3>
+        <p class="text-xs text-slate-400">Split automatically among roommates</p>
+      </div>
+      <button type="button" onclick="closeExpenseModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition">
+        &times;
+      </button>
+    </div>
+
+    <form method="post" action="/expenses/add/" class="space-y-4">
+      <input type="hidden" name="csrfmiddlewaretoken" value="VdXjt1N8iw8XG7EKfdNqymgVxhQ6nEqVbGhFXBao55SSdwERcvm74W0280zkcY3b">
+      <input type="hidden" name="group_id" value="1">
+      <div>
+        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Description</label>
+        <input type="text" name="description" required placeholder="e.g. Wi-Fi bill, Household supplies, Pizza"
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Total Amount ($)</label>
+          <input type="number" step="0.01" min="0.01" name="amount" required placeholder="0.00"
+                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Category</label>
+          <select name="category" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            
+              <option value="General">General</option>
+            
+              <option value="Groceries">Groceries</option>
+            
+              <option value="Utilities">Utilities</option>
+            
+              <option value="Rent">Rent</option>
+            
+              <option value="Dining">Dining Out</option>
+            
+              <option value="Entertainment">Entertainment</option>
+            
+              <option value="Household">Household Supplies</option>
+            
+              <option value="Transportation">Transportation</option>
+            
+              <option value="Furniture">Furniture</option>
+            
+              <option value="Gifts">Gifts</option>
+            
+              <option value="Payment">Payment</option>
+            
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Paid By</label>
+          
+          <select name="paid_by" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            
+              <option value="1" selected>Alex Chen</option>
+            
+              <option value="2" >Sarah Jenkins</option>
+            
+              <option value="3" >Marcus Vance</option>
+            
+              <option value="4" >Elena Rostova</option>
+            
+          </select>
+          
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Date (Auto-filled)</label>
+          <div class="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 text-sm font-semibold flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+              Oct 04, 2026
+            </span>
+            <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-full">Today</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Split Among Roommates -->
+      <div>
+        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">Split Equally Among</label>
+        <div class="grid grid-cols-2 gap-2">
+          
+          <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 cursor-pointer">
+            <input type="checkbox" name="split_roommates" value="1" checked
+                   class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+            <span class="text-xs font-semibold text-slate-800 dark:text-slate-200">Alex Chen</span>
+          </label>
+          
+          <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 cursor-pointer">
+            <input type="checkbox" name="split_roommates" value="2" checked
+                   class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+            <span class="text-xs font-semibold text-slate-800 dark:text-slate-200">Sarah Jenkins</span>
+          </label>
+          
+          <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 cursor-pointer">
+            <input type="checkbox" name="split_roommates" value="3" checked
+                   class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+            <span class="text-xs font-semibold text-slate-800 dark:text-slate-200">Marcus Vance</span>
+          </label>
+          
+          <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 cursor-pointer">
+            <input type="checkbox" name="split_roommates" value="4" checked
+                   class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+            <span class="text-xs font-semibold text-slate-800 dark:text-slate-200">Elena Rostova</span>
+          </label>
+          
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Notes (Optional)</label>
+        <input type="text" name="notes" placeholder="Additional details (mention original past date here if desired)..."
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+
+      <div class="pt-2 flex items-center justify-end gap-2.5 border-t border-slate-100 dark:border-slate-800">
+        <button type="button" onclick="closeExpenseModal()"
+                class="px-4 py-2.5 rounded-xl text-sm font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+          Cancel
+        </button>
+        <button type="submit"
+                class="px-5 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm transition">
+          Save Expense
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL: SETTLE UP -->
+<!-- ======================================================== -->
+<div id="settle-modal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+  <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 sm:p-7 space-y-5 animate-card-enter">
+    <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+      <div>
+        <h3 class="text-lg font-bold text-slate-900 dark:text-white">Record a Payment</h3>
+        <p class="text-xs text-slate-400">Settle debts between roommates</p>
+      </div>
+      <button type="button" onclick="closeSettleModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition">
+        &times;
+      </button>
+    </div>
+
+    <form method="post" action="/expenses/settle/" class="space-y-4">
+      <input type="hidden" name="csrfmiddlewaretoken" value="VdXjt1N8iw8XG7EKfdNqymgVxhQ6nEqVbGhFXBao55SSdwERcvm74W0280zkcY3b">
+      <input type="hidden" name="group_id" value="1">
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Who Paid?</label>
+          <select id="settle_payer" name="payer_id" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            
+              <option value="1" selected>Alex Chen</option>
+            
+              <option value="2" >Sarah Jenkins</option>
+            
+              <option value="3" >Marcus Vance</option>
+            
+              <option value="4" >Elena Rostova</option>
+            
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Who Was Paid?</label>
+          <select id="settle_recipient" name="recipient_id" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            
+              <option value="1" >Alex Chen</option>
+            
+              <option value="2" selected>Sarah Jenkins</option>
+            
+              <option value="3" >Marcus Vance</option>
+            
+              <option value="4" >Elena Rostova</option>
+            
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Amount ($)</label>
+        <input id="settle_amount" type="number" step="0.01" min="0.01" name="amount" required placeholder="0.00"
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Payment Method / Note</label>
+        <input type="text" name="notes" placeholder="e.g. Interac e-Transfer, Cash, PayPal"
+               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+
+      <div class="pt-2 flex items-center justify-end gap-2.5 border-t border-slate-100 dark:border-slate-800">
+        <button type="button" onclick="closeSettleModal()"
+                class="px-4 py-2.5 rounded-xl text-sm font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+          Cancel
+        </button>
+        <button type="submit"
+                class="px-5 py-2.5 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition">
+          Record Payment
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function openExpenseModal() {
+    document.getElementById('expense-modal').classList.remove('hidden');
+  }
+  function closeExpenseModal() {
+    document.getElementById('expense-modal').classList.add('hidden');
+  }
+  function openSettleModal() {
+    document.getElementById('settle-modal').classList.remove('hidden');
+  }
+  function closeSettleModal() {
+    document.getElementById('settle-modal').classList.add('hidden');
+  }
+  function settleWith(myId, friendId, amount, status) {
+    const payerSelect = document.getElementById('settle_payer');
+    const recipientSelect = document.getElementById('settle_recipient');
+    const amountInput = document.getElementById('settle_amount');
+
+    if (status === 'you_owe') {
+      payerSelect.value = myId;
+      recipientSelect.value = friendId;
+    } else {
+      payerSelect.value = friendId;
+      recipientSelect.value = myId;
+    }
+
+    if (amount) {
+      amountInput.value = parseFloat(amount.replace(/[^0-9.]/g, '')).toFixed(2);
+    }
+    openSettleModal();
+  }
+</script>
 
   </main>
 
-  <!-- ========================================== -->
-  <!-- MODAL: ADD EXPENSE -->
-  <!-- ========================================== -->
-  <div id="modal-add-expense" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-xl">
-      <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-        <h3 class="text-sm font-bold text-slate-900 dark:text-white">Record New Expense</h3>
-        <button onclick="closeModal('modal-add-expense')" class="text-slate-400 hover:text-slate-600">&times;</button>
-      </div>
+  <!-- Mobile Native PWA Bottom Navigation Bar (Visible only on small screens) -->
+  <nav class="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 px-4 py-2 transition-colors">
+    <div class="flex items-center justify-around max-w-md mx-auto">
+      <!-- Ledger -->
+      <a href="index.html"
+         class="flex flex-col items-center gap-1 text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+        </svg>
+        <span>Ledger</span>
+      </a>
 
-      <form id="add-expense-form" onsubmit="handleAddExpense(event)" class="space-y-3.5 text-xs">
-        <div>
-          <label class="block font-semibold mb-1 text-slate-700 dark:text-slate-300">Description</label>
-          <input type="text" id="exp-desc" required placeholder="e.g., Organic Groceries, Paper Towels" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-        </div>
+      <!-- Groups -->
+      <a href="groups.html"
+         class="flex flex-col items-center gap-1 text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
+        <span>Groups</span>
+      </a>
 
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block font-semibold mb-1 text-slate-700 dark:text-slate-300">Amount (CAD)</label>
-            <input type="number" step="0.01" id="exp-amt" required placeholder="0.00" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-          </div>
-          <div>
-            <label class="block font-semibold mb-1 text-slate-700 dark:text-slate-300">Category</label>
-            <select id="exp-cat" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-              <option value="Groceries">Groceries</option>
-              <option value="Utilities">Utilities</option>
-              <option value="Household">Household</option>
-              <option value="Dining">Dining</option>
-            </select>
-          </div>
-        </div>
+      <!-- Analytics -->
+      <a href="analytics.html"
+         class="flex flex-col items-center gap-1 text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+        <span>Analytics</span>
+      </a>
 
-        <!-- Strictly Locked Date Field -->
-        <div>
-          <label class="block font-semibold mb-1 text-slate-700 dark:text-slate-300">Date (Server-Enforced)</label>
-          <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-mono text-xs w-full">
-            <span>🔒</span>
-            <span id="current-date-badge">2026-10-03</span>
-            <span class="text-[10px] text-slate-400 ml-auto">Immutable current date</span>
-          </div>
-        </div>
+      
+      <!-- Superstore Inbox (Admin only) -->
+      <a href="receipts.html"
+         class="relative flex flex-col items-center gap-1 text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        </svg>
+        <span>Inbox</span>
+        
+        <span class="absolute -top-1 -right-1.5 w-3.5 h-3.5 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center">
+          1
+        </span>
+        
+      </a>
+      
 
-        <div>
-          <label class="block font-semibold mb-1 text-slate-700 dark:text-slate-300">Paid By</label>
-          <select id="exp-payer" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
-            <option value="Alex Chen">Alex Chen (You)</option>
-            <option value="Sarah Jenkins">Sarah Jenkins</option>
-            <option value="Marcus Vance">Marcus Vance</option>
-            <option value="Elena Rostova">Elena Rostova</option>
-          </select>
-        </div>
-
-        <div class="pt-2 flex justify-end gap-2">
-          <button type="button" onclick="closeModal('modal-add-expense')" class="px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">Cancel</button>
-          <button type="submit" class="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold">Add to Ledger</button>
-        </div>
-      </form>
+      <!-- Profile Tab -->
+      
+      <a href="#"
+         class="flex flex-col items-center gap-1 text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+        <span class="w-5 h-5 rounded-full bg-amber-600 text-white font-bold text-[10px] flex items-center justify-center">
+          A
+        </span>
+        <span>Profile</span>
+      </a>
+      
     </div>
-  </div>
+  </nav>
 
-  <!-- ========================================== -->
-  <!-- MODAL: SETTLE UP -->
-  <!-- ========================================== -->
-  <div id="modal-settle-up" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-xl">
-      <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-        <h3 class="text-sm font-bold text-slate-900 dark:text-white">Record Settlement Payment</h3>
-        <button onclick="closeModal('modal-settle-up')" class="text-slate-400 hover:text-slate-600">&times;</button>
-      </div>
-
-      <form id="settle-form" onsubmit="handleSettleUp(event)" class="space-y-3.5 text-xs">
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block font-semibold mb-1 text-slate-700 dark:text-slate-300">Payer (Debtor)</label>
-            <select id="settle-payer" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
-              <option value="Alex Chen">Alex Chen</option>
-              <option value="Sarah Jenkins">Sarah Jenkins</option>
-              <option value="Marcus Vance">Marcus Vance</option>
-              <option value="Elena Rostova">Elena Rostova</option>
-            </select>
-          </div>
-          <div>
-            <label class="block font-semibold mb-1 text-slate-700 dark:text-slate-300">Recipient (Creditor)</label>
-            <select id="settle-recipient" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
-              <option value="Marcus Vance">Marcus Vance</option>
-              <option value="Alex Chen">Alex Chen</option>
-              <option value="Sarah Jenkins">Sarah Jenkins</option>
-              <option value="Elena Rostova">Elena Rostova</option>
-            </select>
-          </div>
-        </div>
-
-        <div>
-          <label class="block font-semibold mb-1 text-slate-700 dark:text-slate-300">Payment Amount (CAD)</label>
-          <input type="number" step="0.01" id="settle-amt" required placeholder="65.30" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
-        </div>
-
-        <div class="pt-2 flex justify-end gap-2">
-          <button type="button" onclick="closeModal('modal-settle-up')" class="px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">Cancel</button>
-          <button type="submit" class="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold">Record Payment</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Application Logic -->
   <script>
-    // Tab Switching
-    function switchTab(tabId) {
-      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-      document.getElementById('tab-' + tabId).classList.add('active');
-
-      ['ledger', 'groups', 'superstore', 'analytics'].forEach(t => {
-        const btn = document.getElementById('tab-btn-' + t);
-        if (t === tabId) {
-          btn.className = 'px-3 py-1.5 rounded-xl transition bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 font-bold';
-        } else {
-          btn.className = 'px-3 py-1.5 rounded-xl transition text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60';
-        }
-      });
-
-      if (tabId === 'analytics') {
-        renderCharts();
+    // Group Switcher Menu Toggle
+    function toggleGroupMenu() {
+      const menu = document.getElementById('group-dropdown');
+      if (menu) {
+        menu.classList.toggle('hidden');
       }
     }
 
-    // Dark Mode Toggle
-    function toggleDarkMode() {
-      const isDark = document.documentElement.classList.toggle('dark');
-      document.getElementById('theme-icon').innerText = isDark ? '☀️' : '🌙';
-      localStorage.setItem('splitflow-demo-theme', isDark ? 'dark' : 'light');
-    }
-    if (localStorage.getItem('splitflow-demo-theme') === 'dark' || (!localStorage.getItem('splitflow-demo-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-      document.documentElement.classList.add('dark');
-      document.getElementById('theme-icon').innerText = '☀️';
+    // Profile Switcher Menu Toggle
+    function toggleProfileMenu() {
+      const menu = document.getElementById('profile-dropdown');
+      if (menu) {
+        menu.classList.toggle('hidden');
+      }
     }
 
-    // Modal helpers
-    function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
-    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-
-    // Initial Synthetic Data
-    const roommates = ['Alex Chen', 'Sarah Jenkins', 'Marcus Vance', 'Elena Rostova'];
-    let expenses = [
-      { id: 1, desc: 'Weekly Household Groceries', amt: 124.50, cat: 'Groceries', paidBy: 'Alex Chen', date: '2026-10-03', splitWith: ['Alex Chen', 'Sarah Jenkins', 'Marcus Vance', 'Elena Rostova'], isSettlement: false },
-      { id: 2, desc: 'Fiber High-Speed Internet', amt: 85.00, cat: 'Utilities', paidBy: 'Marcus Vance', date: '2026-10-03', splitWith: ['Alex Chen', 'Sarah Jenkins', 'Marcus Vance', 'Elena Rostova'], isSettlement: false },
-      { id: 3, desc: 'Olive Oil & Kitchen Spices', amt: 34.20, cat: 'Groceries', paidBy: 'Sarah Jenkins', date: '2026-10-02', splitWith: ['Alex Chen', 'Sarah Jenkins'], isSettlement: false },
-      { id: 4, desc: 'Dishwashing Detergent & Sponges', amt: 18.90, cat: 'Household', paidBy: 'Elena Rostova', date: '2026-10-02', splitWith: ['Alex Chen', 'Sarah Jenkins', 'Marcus Vance', 'Elena Rostova'], isSettlement: false },
-      { id: 5, desc: 'Settle Up: Alex to Marcus', amt: 40.00, cat: 'Payment', paidBy: 'Alex Chen', date: '2026-10-03', splitWith: ['Marcus Vance'], isSettlement: true }
-    ];
-
-    // Client-Side Min-Cash-Flow Calculation Engine
-    function recalculateBalances() {
-      const net = {};
-      roommates.forEach(r => net[r] = 0);
-
-      expenses.forEach(e => {
-        if (e.isSettlement) {
-          net[e.paidBy] += e.amt;
-          net[e.splitWith[0]] -= e.amt;
-        } else {
-          net[e.paidBy] += e.amt;
-          const share = e.amt / e.splitWith.length;
-          e.splitWith.forEach(r => net[r] -= share);
-        }
-      });
-
-      const myNet = net['Alex Chen'];
-      const netCard = document.getElementById('card-total-net');
-      if (myNet >= 0) {
-        netCard.innerText = '+$' + myNet.toFixed(2);
-        netCard.className = 'text-3xl font-extrabold text-emerald-600 dark:text-emerald-400';
-      } else {
-        netCard.innerText = '-$' + Math.abs(myNet).toFixed(2);
-        netCard.className = 'text-3xl font-extrabold text-rose-600 dark:text-rose-400';
+    // Close menu when clicking outside
+    document.addEventListener('click', function(e) {
+      const pContainer = document.getElementById('profile-menu-container');
+      const pDropdown = document.getElementById('profile-dropdown');
+      if (pContainer && pDropdown && !pContainer.contains(e.target)) {
+        pDropdown.classList.add('hidden');
       }
 
-      // Render Transaction Stream
-      const container = document.getElementById('expense-list');
-      container.innerHTML = '';
-      expenses.slice().reverse().forEach(e => {
-        const row = document.createElement('div');
-        row.className = 'p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/40 transition text-xs';
-        row.innerHTML = `
-          <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-xl ${e.isSettlement ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600' : 'bg-indigo-50 dark:bg-indigo-950 text-indigo-600'} flex items-center justify-center font-bold">
-              ${e.isSettlement ? '🤝' : '🛒'}
-            </div>
-            <div>
-              <div class="font-bold text-slate-800 dark:text-slate-200">${e.desc}</div>
-              <div class="text-[11px] text-slate-400">${e.date} &bull; Paid by <span class="font-semibold text-slate-600 dark:text-slate-300">${e.paidBy}</span></div>
-            </div>
-          </div>
-          <div class="flex items-center gap-4 text-right">
-            <div>
-              <div class="font-bold text-sm text-slate-900 dark:text-white">$${e.amt.toFixed(2)}</div>
-              <div class="text-[11px] text-slate-400">${e.isSettlement ? 'Direct Payment' : e.splitWith.length + ' shares'}</div>
-            </div>
-            <button onclick="deleteExpense(${e.id})" class="text-slate-300 hover:text-rose-500 font-bold px-1.5 py-0.5 rounded">&times;</button>
-          </div>
-        `;
-        container.appendChild(row);
+      const gContainer = document.getElementById('group-switcher-container');
+      const gDropdown = document.getElementById('group-dropdown');
+      if (gContainer && gDropdown && !gContainer.contains(e.target)) {
+        gDropdown.classList.add('hidden');
+      }
+    });
+
+    // Theme Switcher Sync & Logic
+    function syncToggleUI(isDark) {
+      var toggleBtn = document.getElementById('theme-toggle-btn');
+      var toggleThumb = document.getElementById('theme-toggle-thumb');
+      var sunIcon = document.getElementById('theme-sun-icon');
+      var moonIcon = document.getElementById('theme-moon-icon');
+      var metaTheme = document.getElementById('meta-theme-color');
+
+      if (metaTheme) {
+        metaTheme.setAttribute('content', isDark ? '#020617' : '#4f46e5');
+      }
+
+      if (toggleBtn) {
+        toggleBtn.setAttribute('aria-checked', isDark ? 'true' : 'false');
+        toggleBtn.setAttribute('title', isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode');
+        toggleBtn.style.backgroundColor = isDark ? '#334155' : '#cbd5e1';
+      }
+
+      if (toggleThumb) {
+        toggleThumb.style.transform = isDark ? 'translateX(24px)' : 'translateX(0px)';
+        toggleThumb.style.backgroundColor = isDark ? '#0f172a' : '#ffffff';
+      }
+
+      if (sunIcon && moonIcon) {
+        if (isDark) {
+          sunIcon.style.display = 'none';
+          moonIcon.style.display = 'block';
+        } else {
+          sunIcon.style.display = 'block';
+          moonIcon.style.display = 'none';
+        }
+      }
+    }
+
+    function toggleTheme() {
+      var isDark = document.documentElement.classList.toggle('dark');
+      try {
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      } catch (e) {}
+      syncToggleUI(isDark);
+    }
+
+    // Initial theme sync on load
+    document.addEventListener('DOMContentLoaded', function() {
+      var isDark = document.documentElement.classList.contains('dark');
+      syncToggleUI(isDark);
+    });
+
+    // PWA Service Worker Registration & Install Prompt Capture
+    let deferredPrompt;
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/sw.js')
+          .then(function(reg) {
+            console.log('[PWA] Service Worker registered with scope:', reg.scope);
+          })
+          .catch(function(err) {
+            console.warn('[PWA] Service Worker registration failed:', err);
+          });
       });
     }
 
-    function handleAddExpense(ev) {
-      ev.preventDefault();
-      const desc = document.getElementById('exp-desc').value;
-      const amt = parseFloat(document.getElementById('exp-amt').value);
-      const cat = document.getElementById('exp-cat').value;
-      const paidBy = document.getElementById('exp-payer').value;
+    window.addEventListener('beforeinstallprompt', function(e) {
+      e.preventDefault();
+      deferredPrompt = e;
+      const installBtn = document.getElementById('pwa-install-btn');
+      if (installBtn) {
+        installBtn.classList.remove('hidden');
+        installBtn.classList.add('inline-flex');
+      }
+    });
 
-      expenses.push({
-        id: Date.now(),
-        desc: desc,
-        amt: amt,
-        cat: cat,
-        paidBy: paidBy,
-        date: new Date().toISOString().slice(0, 10),
-        splitWith: [...roommates],
-        isSettlement: false
-      });
-
-      closeModal('modal-add-expense');
-      document.getElementById('add-expense-form').reset();
-      recalculateBalances();
+    function installPWA() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(function(choiceResult) {
+          if (choiceResult.outcome === 'accepted') {
+            console.log('[PWA] User accepted the install prompt');
+          }
+          deferredPrompt = null;
+          const installBtn = document.getElementById('pwa-install-btn');
+          if (installBtn) {
+            installBtn.classList.add('hidden');
+            installBtn.classList.remove('inline-flex');
+          }
+        });
+      }
     }
 
-    function handleSettleUp(ev) {
-      ev.preventDefault();
-      const payer = document.getElementById('settle-payer').value;
-      const recipient = document.getElementById('settle-recipient').value;
-      const amt = parseFloat(document.getElementById('settle-amt').value);
-
-      expenses.push({
-        id: Date.now(),
-        desc: `Settle Up: ${payer} to ${recipient}`,
-        amt: amt,
-        cat: 'Payment',
-        paidBy: payer,
-        date: new Date().toISOString().slice(0, 10),
-        splitWith: [recipient],
-        isSettlement: true
-      });
-
-      closeModal('modal-settle-up');
-      document.getElementById('settle-form').reset();
-      recalculateBalances();
-    }
-
-    function deleteExpense(id) {
-      expenses = expenses.filter(e => e.id !== id);
-      recalculateBalances();
-    }
-
-    // Populate Superstore Table Demo
-    const sampleReceiptItems = [
-      { name: 'Lucerne 2% Partly Skimmed Milk 4L', qty: '1', price: 5.99, assigned: ['Alex', 'Sarah', 'Marcus', 'Elena'] },
-      { name: 'Large Brown Eggs Free Run 18pk', qty: '1', price: 6.49, assigned: ['Alex', 'Sarah', 'Marcus', 'Elena'] },
-      { name: 'Organic Gala Apples 3lb Bag', qty: '1', price: 7.99, assigned: ['Sarah', 'Elena'] },
-      { name: 'Whole Grain Sliced Sandwich Bread', qty: '1', price: 3.79, assigned: ['Alex', 'Marcus'] },
-      { name: 'PC Lemon Sparkling Water 12x355ml', qty: '1', price: 6.49, assigned: ['Alex', 'Sarah', 'Marcus', 'Elena'] },
-      { name: 'Extra Virgin Olive Oil Cold Pressed 1L', qty: '1', price: 14.99, assigned: ['Alex', 'Sarah', 'Marcus', 'Elena'] },
-      { name: 'Free From Boneless Skinless Chicken Breasts 1.2kg', qty: '1', price: 18.50, assigned: ['Alex', 'Sarah'] },
-      { name: 'Bottle Deposit & Environmental Fees (Reconciled)', qty: '1', price: 1.45, assigned: ['Alex', 'Sarah', 'Marcus', 'Elena'] }
-    ];
-
-    function renderSuperstoreTable() {
-      const tbody = document.getElementById('superstore-items-table');
-      tbody.innerHTML = '';
-      sampleReceiptItems.forEach(item => {
-        const perPerson = (item.price / item.assigned.length).toFixed(2);
-        const tr = document.createElement('tr');
-        tr.className = 'hover:bg-slate-50 dark:hover:bg-slate-800/40';
-        tr.innerHTML = `
-          <td class="py-2.5 font-semibold text-slate-800 dark:text-slate-200">${item.name}</td>
-          <td class="py-2.5 text-slate-500">${item.qty}</td>
-          <td class="py-2.5 font-mono text-slate-900 dark:text-white">$${item.price.toFixed(2)}</td>
-          <td class="py-2.5">
-            <span class="inline-flex gap-1">
-              ${item.assigned.map(n => `<span class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-300">${n}</span>`).join('')}
-            </span>
-          </td>
-          <td class="py-2.5 text-right font-mono font-bold text-slate-700 dark:text-slate-300">$${perPerson}/ea</td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    // Chart.js Rendering
-    let chartsRendered = false;
-    function renderCharts() {
-      if (chartsRendered) return;
-      chartsRendered = true;
-
-      const ctxM = document.getElementById('monthlyChart').getContext('2d');
-      new Chart(ctxM, {
-        type: 'bar',
-        data: {
-          labels: ['June', 'July', 'August', 'September', 'October'],
-          datasets: [{
-            label: 'Monthly Spending (CAD)',
-            data: [420.50, 580.10, 510.00, 640.80, 520.45],
-            backgroundColor: '#4f46e5',
-            borderRadius: 6
-          }]
-        },
-        options: { responsive: true, plugins: { legend: { display: false } } }
-      });
-
-      const ctxC = document.getElementById('categoryChart').getContext('2d');
-      new Chart(ctxC, {
-        type: 'doughnut',
-        data: {
-          labels: ['Groceries', 'Utilities', 'Household', 'Dining'],
-          datasets: [{
-            data: [62, 18, 12, 8],
-            backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ec4899']
-          }]
-        },
-        options: { responsive: true }
-      });
-    }
-
-    // Init
-    recalculateBalances();
-    renderSuperstoreTable();
-    const initialTab = window.location.hash.replace('#', '') || new URLSearchParams(window.location.search).get('tab');
-    if (initialTab && ['ledger', 'groups', 'superstore', 'analytics'].includes(initialTab)) {
-      switchTab(initialTab);
-    }
+    window.addEventListener('appinstalled', function() {
+      console.log('[PWA] SplitFlow installed as standalone app');
+      const installBtn = document.getElementById('pwa-install-btn');
+      if (installBtn) {
+        installBtn.classList.add('hidden');
+        installBtn.classList.remove('inline-flex');
+      }
+    });
   </script>
+
+<script>
+  // SplitFlow Demo Interactivity Shim for Static Pages
+  document.addEventListener('DOMContentLoaded', function() {
+    // Intercept Add Expense modal form submit
+    const expForm = document.querySelector('#expense-modal form');
+    if (expForm) {
+      expForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        alert('Expense recorded in demo mode! In a live deployment, this transaction writes atomically to the database.');
+        if (typeof closeExpenseModal === 'function') closeExpenseModal();
+      });
+    }
+
+    // Intercept Settle Up modal form submit
+    const settleForm = document.querySelector('#settle-modal form');
+    if (settleForm) {
+      settleForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        alert('Equalization payment recorded in demo mode!');
+        if (typeof closeSettleModal === 'function') closeSettleModal();
+      });
+    }
+
+    // Ensure links to Django routes gracefully navigate static demo pages
+    document.querySelectorAll('a[href]').forEach(function(link) {
+      const href = link.getAttribute('href');
+      if (href === '/') link.setAttribute('href', 'index.html');
+      else if (href === '/groups/') link.setAttribute('href', 'groups.html');
+      else if (href === '/analytics/') link.setAttribute('href', 'analytics.html');
+      else if (href === '/receipts/') link.setAttribute('href', 'receipts.html');
+      else if (href === '/groups/import-splitwise/') link.setAttribute('href', 'import_splitwise.html');
+      else if (href.startsWith('/batch/assign/')) link.setAttribute('href', 'batch_process.html');
+      else if (href.startsWith('/batch/summary/')) link.setAttribute('href', 'batch_summary.html');
+    });
+  });
+</script>
+
 </body>
 </html>

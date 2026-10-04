@@ -618,6 +618,10 @@
     // Init
     recalculateBalances();
     renderSuperstoreTable();
+    const initialTab = window.location.hash.replace('#', '') || new URLSearchParams(window.location.search).get('tab');
+    if (initialTab && ['ledger', 'groups', 'superstore', 'analytics'].includes(initialTab)) {
+      switchTab(initialTab);
+    }
   </script>
 </body>
 </html>
